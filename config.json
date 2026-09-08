@@ -1,17 +1,52 @@
 {
   "interval_s": 5,
-  "pings_per_probe": 4,
+  "pings_per_probe": 3,
   "ping_timeout_ms": 1500,
   "targets": ["1.1.1.1", "8.8.8.8"],
   "window_cycles": 6,
+
+  "dns": {
+    "test_hosts": ["cloudflare.com", "google.com", "github.com"],
+    "hijack_probe_prefix": "netpilot-nxd",
+    "hijack_probe_suffix": ".invalid",
+    "slow_ms": 100
+  },
+
+  "bloat": {
+    "url": "https://speed.cloudflare.com/__down?bytes=10000000",
+    "load_pings": 10,
+    "min_download_mb": 1,
+    "grade": { "excellent": 5, "good": 30, "moderate": 60, "severe": 150 }
+  },
+
+  "wifi_env": {
+    "crowded_channel_aps": 6,
+    "strong_signal_threshold_pct": 55
+  },
+
+  "traceroute": {
+    "max_hops": 15,
+    "timeout_ms": 800
+  },
+
+  "mtu": {
+    "min": 1200,
+    "max": 1472
+  },
+
   "thresholds": { "go": 75, "warn": 40 },
+  "grades": { "A": 90, "B": 75, "C": 60, "D": 40 },
   "score_weights": {
     "loss_penalty_per_pct": 15,
     "rtt_baseline_ms": 60,
     "rtt_penalty_per_ms": 0.3,
     "jitter_penalty_per_ms": 0.5
   },
+
   "dead_sustain_s": 30,
+  "spike_p95_ms": 250,
   "auto_switch_cooldown_s": 300,
+
+  "deep_interval_min": 30,
   "log_enabled": true
 }

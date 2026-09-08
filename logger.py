@@ -1,13 +1,15 @@
-"""Logger: appends every probe cycle to a CSV for later reporting."""
+"""Logger v2: appends every probe cycle to CSV for reporting.
+
+Schema v2 adds radio, DNS, VPN and per-domain score columns. A legacy v1
+file (from NetPilot 1.x) is archived automatically on first write.
+"""
 
 from __future__ import annotations
 
 import csv
-import os
+import shutil
 from datetime import datetime
 from pathlib import Path
-
-from health import HealthSnapshot
 
 BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "logs"
@@ -16,37 +18,55 @@ LOG_FILE = LOG_DIR / "netpilot.csv"
 FIELDS = [
     "timestamp",
     "ssid",
+    "bssid",
+    "band",
+    "channel",
+    "signal_pct",
+    "tx_rate_mbps",
+    "cochannel_aps",
     "gateway",
     "gw_loss_pct",
     "gw_avg_ms",
     "net_loss_pct",
     "net_avg_ms",
     "net_jitter_ms",
-    "net_score",
-    "net_verdict",
+    "net_p95_ms",
+    "dns_avg_ms",
+    "dns_failures",
+    "dns_hijack",
+    "vpn",
+    "path_score",
+    "link_score",
+    "dns_score",
+    "radio_score",
+    "overall_score",
+    "overall_grade",
+    "verdict",
 ]
 
+_V1_FIELDS = {"timestamp", "ssid", "gateway", "gw_loss_pct", "gw_avg_ms", "net_loss_pct",
+              "net_avg_ms", "net_jitter_ms", "net_score", "net_verdict"}
 
-def append_row(
-    ssid: str | None,
-    gateway: str | None,
-    gw_snap: HealthSnapshot | None,
-    net_snap: HealthSnapshot,
-) -> None:
+
+def _needs_v2_migration() -> bool:
+    if not LOG_FILE.exists():
+        return False
+    with open(LOG_FILE, encoding="utf-8") as f:
+        try:
+            header = next(csv.reader(f))
+        except StopIteration:
+            return False
+    return set(header) == _V1_FIELDS
+
+
+def append_row(data: dict) -> None:
     LOG_DIR.mkdir(exist_ok=True)
+    if _needs_v2_migration():
+        backup = LOG_FILE.with_name("netpilot_v1_backup.csv")
+        shutil.move(str(LOG_FILE), str(backup))
+
     is_new = not LOG_FILE.exists()
-    row = {
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "ssid": ssid or "unknown",
-        "gateway": gateway or "",
-        "gw_loss_pct": f"{gw_snap.loss_pct:.1f}" if gw_snap else "",
-        "gw_avg_ms": f"{gw_snap.avg_ms:.1f}" if gw_snap and gw_snap.avg_ms is not None else "",
-        "net_loss_pct": f"{net_snap.loss_pct:.1f}",
-        "net_avg_ms": f"{net_snap.avg_ms:.1f}" if net_snap.avg_ms is not None else "",
-        "net_jitter_ms": f"{net_snap.jitter_ms:.1f}" if net_snap.jitter_ms is not None else "",
-        "net_score": f"{net_snap.score:.1f}",
-        "net_verdict": net_snap.verdict,
-    }
+    row = {k: data.get(k, "") for k in FIELDS}
     with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         if is_new:
@@ -63,7 +83,3 @@ def row_count() -> int:
         return 0
     with open(LOG_FILE, encoding="utf-8") as f:
         return max(0, sum(1 for _ in f) - 1)
-
-
-def os_name() -> str:
-    return os.name

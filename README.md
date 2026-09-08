@@ -1,96 +1,156 @@
 # NetPilot 📡
 
-**Personal network health monitor for Windows** — born out of two days of fighting
-hostel WiFi and mobile hotspot congestion while trying to play Valorant on campus.
+**A comprehensive network health monitor for Windows** — built after two days of
+fighting hostel Wi-Fi and mobile hotspot congestion. NetPilot measures everything
+that actually makes a network *feel* bad, tells you exactly **which layer is the
+problem**, and learns **when your networks are usable** over time.
 
-It answers two questions:
+> Speedtests measure Mbps. NetPilot measures what hurts: latency, jitter, packet
+> loss, bufferbloat, DNS behavior, radio congestion — layer by layer.
 
-1. **Is my network good RIGHT NOW?** — live dashboard with a health score, for
-   anything you care about: classes, calls, downloads, gaming.
-2. **WHEN is each of my networks actually usable?** — a congestion heatmap built
-   from 24/7 logs that shows which hours each network (campus WiFi / phone
-   hotspot / home WiFi) is healthy or dying.
+```
+$ python netpilot.py --full
+```
+```
+┌───────────────────── NetPilot ── 2026-09-09 14:22 ─────────────────────┐
+│  OVERALL: A 92/100 — GO      path A · link A · DNS A · radio B        │
+│  Campus-5G · 5 GHz ch36 · VPN: none                                    │
+├───────────────────────┬────────────────────────────────────────────────┤
+│ LOCAL LINK            │ INTERNET PATH                                  │
+│  gateway 2 ms · 0%    │  34 ms avg · 5 ms jitter · p95 48 · 0% loss    │
+│  signal 100%          │  Trend: ▁▂▂▁▃▁▁▂▁▁▁▂▁                          │
+│ WIFI ENVIRONMENT      │ DNS                                            │
+│  ch36: 2 strong       │  resolvers 10.x · 12 ms · no hijack            │
+│  "radio clean"        │ DEEP: bloat A (+8ms) · 42 Mbps · MTU 1500      │
+├───────────────────────┴────────────────────────────────────────────────┤
+│ EVENTS: 21:34 OUTAGE 4m — upstream congestion · 20:01 AP_ROAM ...      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-## Why
+## What it measures (and why)
 
-Two networks, both flaky, both dying at *different times of day* — and Windows
-gives you zero visibility into which one to be on. Speedtests are useless here:
-they measure Mbps, but for calls and games what matters is **latency, jitter and
-packet loss**. NetPilot measures exactly those, and separately for:
+| Domain | What | Why it matters |
+|---|---|---|
+| **Local link** | latency/loss to your gateway | isolates "laptop ↔ router" problems (distance, interference, adapter sleep) |
+| **Internet path** | latency, jitter, p95, loss to multiple targets | the core "is my network usable" signal |
+| **Route** | hop-by-hop traceroute analysis | pinpoints *where* on the path the pain starts (e.g. carrier CGNAT) |
+| **Bufferbloat** | latency under download load | the classic "everything lags when someone downloads" — invisible to speedtests |
+| **Throughput** | quick download Mbps | measured during the bloat test, free of charge |
+| **DNS** | resolver identification, lookup latency, **hijack detection** | campus/captive portals intercepting DNS cause mystery redirects and stalls |
+| **Radio environment** | channel scan of all nearby APs, co-channel congestion, 5 GHz availability | "your channel has 11 strong neighbours" and "your SSID also has a 5 GHz twin — switch" |
+| **Path MTU** | DF-ping binary search | detects silent large-packet blackholes (common with VPNs/firewalls) |
+| **VPN awareness** | detects WARP / WireGuard / Tailscale / OpenVPN | measurements are interpreted differently when tunneled |
+| **Events** | disconnects, AP roaming, outages, DNS failures | a timeline of *incidents*, with availability % |
 
-- **Local link** (laptop ↔ router/gateway) — catches WiFi distance/interference issues
-- **Internet path** (router ↔ the world) — catches ISP/campus congestion
-
-so it can tell you *which side* is the problem.
+Everything runs with **no admin rights** and only uses built-in Windows tools
+(`ping`, `netsh`, `route`, `tracert`) — nothing sketchy, nothing phoning home.
 
 ## Install
 
-Python 3.10+ on Windows. Everything needed is stdlib + `rich`.
+Python 3.10+ on Windows.
 
 ```bash
-pip install rich            # required
-pip install plyer           # optional: Windows toast notifications
-pip install pandas matplotlib   # only needed for --report
+pip install rich                 # required — dashboard
+pip install pandas matplotlib    # required — reports
+pip install plyer                # optional — Windows toast notifications
 ```
 
 ## Usage
 
 ```bash
-python netpilot.py                # live dashboard (Ctrl+C to stop)
-python netpilot.py --once         # one-shot check; exit code 0 GO / 1 WARN / 2 DEAD
-python netpilot.py --report       # congestion heatmap + best/worst hours per network
+python netpilot.py                    # live dashboard (Ctrl+C to stop)
+python netpilot.py --once             # quick check → exit code 0 GO / 1 WARN / 2 DEAD
+python netpilot.py --full             # deep diagnostics (~1 min: traceroute, bufferbloat,
+                                      #   throughput, path MTU, channel scan, VPN detect)
+python netpilot.py --report           # heatmap + schedules + incidents + HTML report
 python netpilot.py --report --days 14
-python netpilot.py --auto "MyHotspot"   # auto-switch to a saved Wi-Fi when DEAD 30s+
+python netpilot.py --auto "MyHotspot" # auto-switch to a saved Wi-Fi after 30s of DEAD
+python netpilot.py --deep-interval 15 # live mode: deep diagnostics every 15 min
 ```
 
-**The routine:** run the monitor (or `--once`) whenever you're about to do
-something that matters. Trust the verdict, not the speedtest.
+**The routine:** run `--full` once per network to meet it, keep the live monitor
+running when you care, and check `--report` after a few days to learn your
+networks' schedules.
 
-## Reading the dashboard
+## Scoring
+
+Each domain gets a 0–100 score and a letter grade (A ≥90, B ≥75, C ≥60, D ≥40, else F).
+The overall score is a weighted roll-up (path 45%, link 25%, DNS 15%, radio 15%,
++20% bufferbloat when tested); untested domains are dropped and weights
+renormalized, so a light cycle still scores fairly.
+
+Verdict thresholds (tunable in `config.json`):
+
+| Verdict | Meaning | Real-world anchor |
+|---|---|---|
+| **GO** (≥75) | do your thing | 48 ms / 0% loss ≈ 93 |
+| **WARN** (40–74) | usable, expect stutters | ~6% loss |
+| **DEAD** (<40) | switch networks or wait | 217 ms avg, wild jitter |
+
+Some campus APs ignore pings to the gateway — NetPilot detects this and refuses
+to blame your local link for it.
+
+## Reports
+
+`python netpilot.py --report` produces:
+
+- `reports/netpilot_report.png` — hour-of-day congestion heatmap per network
+  (median latency + mean loss)
+- `reports/netpilot_report.html` — standalone shareable report: embedded heatmap,
+  per-network healthy/dead hour schedules, recent incidents, availability %
+- console summary, e.g.
 
 ```
- Network   Campus-5G (5 GHz, 100% signal)
- Gateway   10.12.144.1 — no reply (ICMP blocked, link assumed fine)
- Internet  48 ms avg | 12 ms jitter | p95 61 ms | 6% loss
- Score     21/100 — DEAD
- Verdict   Internet path is congested (ISP/campus). Switch network or wait.
-```
+Campus-5G (3810 samples) — overall 71/100
+  healthy hours: 09:00-18:00
+  dead hours:    19:00-23:00
+Phone    (922 samples)  — overall 88/100
+  healthy hours: 07:00-09:00, 23:00-07:00
+  dead hours:    20:00-22:00
 
-- **GO 🟢 (≥75)** — queue up, you're fine.
-- **WARN 🟡 (40–74)** — usable, but unstable; expect occasional stutters.
-- **DEAD 🔴 (<40)** — switch networks or wait. (Score anchors: 48 ms / 0% loss ≈ 93 → GO;
-  6% loss ≈ WARN/DEAD; 217 ms with wild jitter ≈ DEAD.)
-
-Some APs ignore ping to the gateway (common on campus networks) — NetPilot
-detects this and doesn't count it against you.
-
-## The heatmap
-
-`python netpilot.py --report` renders `reports/netpilot_report.png`: rows are
-your networks, columns are hours of the day, colored by median latency and mean
-loss — plus a plain-English schedule like:
-
-```
-Campus-5G  — healthy hours: 09:00-18:00   dead hours: 19:00-23:00
-Phone      — healthy hours: 07:00-09:00, 00:00-02:00   dead hours: 20:00-23:00
+Availability (uptime while monitored): 96.42%
 ```
 
 Leave the monitor running overnight (plugged in) to map your networks properly.
 
-## Config
+## Project layout
 
-`config.json` — probe targets, interval, score weights and thresholds,
-auto-switch cooldown. All tweakable without touching code.
+```
+netpilot.py     CLI + monitoring engine (light cycles, deep cycles, alerts, auto-switch)
+prober.py       ping/netsh/route wrappers — all raw Windows-tool parsing
+health.py       rolling stats, per-domain scores, grades, roll-up, diagnosis
+dashboard.py    the rich layout (live dashboard + full report rendering)
+wifi_env.py     channel congestion analysis from BSSID scans
+dnscheck.py     resolver detection, lookup latency, NXDOMAIN hijack test
+bloat.py        bufferbloat (latency under load) + throughput
+traceroute.py   hop-by-hop path analysis, loss localization
+mtu.py          path MTU / blackhole detection via DF pings
+vpndetect.py    WARP/WireGuard/Tailscale/OpenVPN detection
+events.py       incident detection (outages, roaming, DNS fails) + timeline
+logger.py       CSV logging (schema v2, auto-migrates v1 files)
+report.py       heatmap, schedules, incidents, availability, HTML export
+config.json     every threshold and target — tweak without touching code
+```
 
 ## Notes & limits
 
-- Windows-only for now (ping/netsh/route parsing).
-- No admin rights needed. Everything runs locally; logs stay in `logs/`.
-- Auto-switch connects to a **saved** Wi-Fi profile only, and only if the
-  network is currently visible; it backs off for 5 minutes after each attempt.
+- Windows-only for now (the probe layer parses `ping`/`netsh`/`route`/`tracert` output).
+- Deep diagnostics download ~16 MB (bufferbloat test) — skip on metered connections
+  or raise/decrease `bloat.url` bytes in the config.
+- Logs and reports stay in `logs/` and `reports/` — they contain your SSIDs, and
+  both folders are git-ignored by default.
+- Auto-switch connects only to **saved** Wi-Fi profiles, only if visible, and backs
+  off for 5 minutes after each attempt.
 
-## Roadmap ideas
+## Roadmap
 
-- Throughput sanity test (small download), not just latency
-- Auto toggle VPN (WireGuard/WARP) on network change
-- Web dashboard + phone notification
+- Upload-direction bufferbloat test
+- Long-baseline stats: week-over-week network quality trends
+- Auto toggle VPN (WireGuard/WARP) on verdict changes
+- Linux/macOS support (probe abstraction)
+- Optional system-tray build (pystray)
+
+---
+
+Born from a real situation: campus Wi-Fi that needs a VPN, a WireGuard box on AWS
+Mumbai, a phone hotspot that dies at 8 pm, and way too many teleports in Valorant.
