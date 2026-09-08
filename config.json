@@ -1,0 +1,17 @@
+{
+  "interval_s": 5,
+  "pings_per_probe": 4,
+  "ping_timeout_ms": 1500,
+  "targets": ["1.1.1.1", "8.8.8.8"],
+  "window_cycles": 6,
+  "thresholds": { "go": 75, "warn": 40 },
+  "score_weights": {
+    "loss_penalty_per_pct": 15,
+    "rtt_baseline_ms": 60,
+    "rtt_penalty_per_ms": 0.3,
+    "jitter_penalty_per_ms": 0.5
+  },
+  "dead_sustain_s": 30,
+  "auto_switch_cooldown_s": 300,
+  "log_enabled": true
+}

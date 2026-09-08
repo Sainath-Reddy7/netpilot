@@ -1,0 +1,133 @@
+"""Health: rolling-window statistics, scoring and verdicts.
+
+The score is tuned against real measurements taken on Indian campus Wi-Fi
+and 4G/5G mobile hotspots:
+    48 ms avg, 0% loss            -> GO     (score ~93)
+    6% loss                       -> WARN
+    217 ms avg, wild jitter       -> DEAD
+"""
+
+from __future__ import annotations
+
+from collections import deque
+from dataclasses import dataclass, field
+
+from prober import PingResult
+
+GO = "GO"
+WARN = "WARN"
+DEAD = "DEAD"
+
+
+@dataclass
+class HealthSnapshot:
+    """Aggregated health of one side (local link or internet path)."""
+
+    label: str
+    loss_pct: float = 0.0
+    avg_ms: float | None = None
+    jitter_ms: float | None = None
+    p95_ms: float | None = None
+    score: float = 0.0
+    verdict: str = DEAD
+    samples: int = 0
+    extra: dict = field(default_factory=dict)
+
+
+def _jitter(times: list[float]) -> float | None:
+    """Mean absolute difference between consecutive samples (RFC 3550 style)."""
+    if len(times) < 2:
+        return None
+    diffs = [abs(b - a) for a, b in zip(times, times[1:])]
+    return sum(diffs) / len(diffs)
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    k = max(0, min(len(ordered) - 1, int(round((pct / 100.0) * (len(ordered) - 1)))))
+    return ordered[k]
+
+
+def compute_score(
+    loss_pct: float,
+    avg_ms: float | None,
+    jitter_ms: float | None,
+    weights: dict,
+) -> float:
+    s = 100.0
+    s -= loss_pct * weights.get("loss_penalty_per_pct", 15)
+    if avg_ms is not None:
+        baseline = weights.get("rtt_baseline_ms", 60)
+        s -= max(0.0, avg_ms - baseline) * weights.get("rtt_penalty_per_ms", 0.3)
+    if jitter_ms is not None:
+        s -= jitter_ms * weights.get("jitter_penalty_per_ms", 0.5)
+    return max(0.0, min(100.0, round(s, 1)))
+
+
+class RollingHealth:
+    """Maintains rolling stats over the last `window_cycles` probe cycles."""
+
+    def __init__(self, label: str, window_cycles: int, weights: dict, thresholds: dict):
+        self.label = label
+        self.weights = weights
+        self.thresholds = thresholds
+        self._cycles: deque[list[PingResult]] = deque(maxlen=window_cycles)
+
+    def add_cycle(self, results: list[PingResult]) -> None:
+        self._cycles.append(results)
+
+    def snapshot(self) -> HealthSnapshot:
+        flat: list[PingResult] = [r for cycle in self._cycles for r in cycle]
+        snap = HealthSnapshot(label=self.label)
+        if not flat:
+            return snap
+
+        total_sent = sum(r.sent for r in flat)
+        total_recv = sum(r.received for r in flat)
+        snap.samples = total_recv
+        snap.loss_pct = 100.0 * (total_sent - total_recv) / total_sent if total_sent else 100.0
+
+        all_times = [t for r in flat for t in r.times_ms]
+        snap.avg_ms = sum(all_times) / len(all_times) if all_times else None
+        snap.p95_ms = _percentile(all_times, 95) if all_times else None
+
+        # Jitter is measured per host (consecutive pings to the same host),
+        # then averaged across hosts for a stable number.
+        jitters = [_jitter(r.times_ms) for r in flat if len(r.times_ms) >= 2]
+        jitters = [j for j in jitters if j is not None]
+        snap.jitter_ms = sum(jitters) / len(jitters) if jitters else None
+
+        snap.score = compute_score(snap.loss_pct, snap.avg_ms, snap.jitter_ms, self.weights)
+        snap.verdict = self._verdict(snap.score)
+        return snap
+
+    def _verdict(self, score: float) -> str:
+        if score >= self.thresholds.get("go", 75):
+            return GO
+        if score >= self.thresholds.get("warn", 40):
+            return WARN
+        return DEAD
+
+
+def diagnose(
+    gateway_snap: HealthSnapshot | None,
+    net_snap: HealthSnapshot,
+    gateway_icmp_blocked: bool = False,
+) -> str:
+    """Plain-English verdict on WHICH side of the path is the problem."""
+    local_bad = gateway_snap is not None and gateway_snap.verdict != GO and not gateway_icmp_blocked
+    net_bad = net_snap.verdict != GO
+
+    if net_bad and local_bad:
+        return "Laptop<->router link AND internet path both unstable. Move closer to the AP / try another network."
+    if net_bad:
+        if gateway_icmp_blocked:
+            return "Internet path is congested (gateway ignores ping, can't isolate further). Switch network or wait."
+        return "Router/WiFi link is fine, but the upstream internet path is congested (ISP/campus). Switch network or wait."
+    if local_bad:
+        return "Local WiFi link to the router is unstable (distance/interference), but internet beyond it is okay."
+    if gateway_icmp_blocked:
+        return "All clear. (Gateway AP ignores ping; internet path is healthy.)"
+    return "All clear."
