@@ -1,5 +1,3 @@
 {
-  "builds": [
-    { "src": "web/index.html", "use": "@vercel/static" }
-  ]
+  "outputDirectory": "web"
 }
