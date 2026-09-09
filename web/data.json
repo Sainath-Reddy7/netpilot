@@ -1,21 +1,22 @@
 {
- "updated": "2026-09-09T14:25:21+05:30",
+ "updated": "2026-09-09T14:32:33+05:30",
  "now": {
   "ssid": "current network",
   "band": "5 GHz",
   "signal": 100,
-  "verdict": "DEAD",
-  "score": 17.6,
+  "verdict": "WARN",
+  "score": 46.2,
   "avg_ms": null,
   "loss_pct": 100.0,
   "jitter_ms": null,
-  "vpn": ""
+  "vpn": "",
+  "note": "ping (ICMP) appears blocked on this network — DNS/TCP still work; treat with caution"
  },
  "networks": [
   {
    "ssid": "Network A",
-   "samples": 1,
-   "median_score": 17.6,
+   "samples": 2,
+   "median_score": 31.9,
    "hourly": [
     {
      "lat": null,
@@ -104,8 +105,8 @@
     {
      "lat": NaN,
      "loss": 100.0,
-     "score": 17.6,
-     "n": 1
+     "score": 31.9,
+     "n": 2
     },
     {
      "lat": null,
