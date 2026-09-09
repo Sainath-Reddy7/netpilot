@@ -171,24 +171,47 @@ def ensure_branch(token: str, repo: str, branch: str) -> bool:
     status, ref = _api("GET", f"{GITHUB_API}/repos/{repo}/git/ref/heads/{branch}", token)
     if status == 200:
         return True
-    status, main_ref = _api("GET", f"{GITHUB_API}/repos/{repo}/git/ref/heads/main", token)
+    status, main_ref = _api("GET", f"{GITHUB_API}/git/ref/heads/main", token)
     if status != 200:
         return False
     status, _ = _api(
         "POST",
-        f"{GITHUB_API}/repos/{repo}/git/refs",
+        f"{GITHUB_API}/git/refs",
         token,
         {"ref": f"refs/heads/{branch}", "sha": main_ref["object"]["sha"]},
     )
     return status in (200, 201)
 
 
-def push_payload(payload: dict, repo: str, branch: str, path: str) -> tuple[bool, str]:
-    """Commit the payload JSON to the data branch. Returns (ok, message)."""
-    token = _github_token()
-    if not token:
-        return False, "no GitHub credential available (git credential fill)"
+_gist_owner_cache: str | None = None
 
+
+def _gist_owner(token: str, gist_id: str) -> str | None:
+    """Login name of the gist owner (cached)."""
+    global _gist_owner_cache
+    if _gist_owner_cache:
+        return _gist_owner_cache
+    status, gist = _api("GET", f"{GITHUB_API}/gists/{gist_id}", token)
+    if status == 200 and gist.get("owner"):
+        _gist_owner_cache = gist["owner"]["login"]
+        return _gist_owner_cache
+    return None
+
+
+def _push_gist(payload: dict, token: str, gist_id: str, filename: str) -> tuple[bool, str]:
+    content = json.dumps(payload, ensure_ascii=False, indent=1)
+    status, resp = _api(
+        "PATCH",
+        f"{GITHUB_API}/gists/{gist_id}",
+        token,
+        {"description": "NetPilot live network health data", "files": {filename: {"content": content}}},
+    )
+    if status == 200:
+        return True, f"pushed to gist {gist_id[:8]}…"
+    return False, f"gist push failed (HTTP {status}: {json.dumps(resp)[:120] if resp else 'no body'})"
+
+
+def _push_branch(payload: dict, token: str, repo: str, branch: str, path: str) -> tuple[bool, str]:
     if not ensure_branch(token, repo, branch):
         return False, f"could not find/create branch '{branch}'"
 
@@ -213,6 +236,17 @@ def push_payload(payload: dict, repo: str, branch: str, path: str) -> tuple[bool
     return False, f"push failed (HTTP {status}: {json.dumps(resp)[:120] if resp else 'no body'})"
 
 
+def push_payload(payload: dict, repo: str, branch: str, path: str, gist_id: str | None = None) -> tuple[bool, str]:
+    """Publish the payload — to a secret gist (preferred) or a repo branch."""
+    token = _github_token()
+    if not token:
+        return False, "no GitHub credential available (git credential fill)"
+
+    if gist_id:
+        return _push_gist(payload, token, gist_id, path.rsplit("/", 1)[-1])
+    return _push_branch(payload, token, repo, branch, path)
+
+
 def sync_once(cfg_sync: dict, now_state: dict | None = None) -> tuple[bool, str]:
     payload = build_payload(
         days=7,
@@ -224,10 +258,18 @@ def sync_once(cfg_sync: dict, now_state: dict | None = None) -> tuple[bool, str]
         cfg_sync.get("repo", "Sainath-Reddy7/netpilot"),
         cfg_sync.get("branch", "data"),
         cfg_sync.get("path", "web/data.json"),
+        gist_id=cfg_sync.get("gist_id"),
     )
 
 
 def raw_data_url(cfg_sync: dict) -> str:
+    gist_id = cfg_sync.get("gist_id")
+    if gist_id:
+        token = _github_token()
+        owner = _gist_owner(token, gist_id) if token else None
+        owner = owner or cfg_sync.get("gist_owner", "Sainath-Reddy7")
+        filename = cfg_sync.get("path", "web/data.json").rsplit("/", 1)[-1]
+        return f"https://gist.githubusercontent.com/{owner}/{gist_id}/raw/{filename}"
     return (
         f"https://raw.githubusercontent.com/{cfg_sync.get('repo', 'Sainath-Reddy7/netpilot')}"
         f"/{cfg_sync.get('branch', 'data')}/{cfg_sync.get('path', 'web/data.json')}"

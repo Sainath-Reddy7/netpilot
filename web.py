@@ -22,6 +22,8 @@ WEB_DIR = BASE_DIR / "web"
 MIN_ROWS = 1
 
 DEFAULT_SYNC_CFG = {
+    "gist_id": "9242530888d662dcc51bc4cb5f89b6e7",
+    "gist_owner": "Sainath-Reddy7",
     "repo": "Sainath-Reddy7/netpilot",
     "branch": "data",
     "path": "web/data.json",
