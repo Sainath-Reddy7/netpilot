@@ -5,194 +5,229 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NetPilot — Live Network Health</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  @property --a { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
   :root {
-    --bg: #070a10; --fg: #eef2f8; --muted: #93a0b4; --muted2: #5d6a7e;
-    --accent: #58a6ff; --accent2: #a371f7;
-    --good: #3fb950; --warn: #e3b341; --bad: #f85149;
-    --glass: rgba(18, 24, 34, .58); --stroke: rgba(255,255,255,.07);
-    --r: 18px;
+    --bg: #05070c; --bg2: #090d15;
+    --fg: #f2f5fb; --muted: #9aa7bb; --muted2: #5c6a80;
+    --blue: #4d9fff; --violet: #a371f7; --teal: #2dd4bf;
+    --good: #34d399; --warn: #fbbf24; --bad: #fb7185;
+    --stroke: rgba(148, 163, 197, .1); --stroke2: rgba(148, 163, 197, .18);
+    --disp: 'Space Grotesk', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scrollbar-color: #2b3444 var(--bg); }
   body {
-    background: var(--bg); color: var(--fg); min-height: 100vh;
-    font-family: ui-sans-serif, 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
-    padding: 0 0 3.5rem; overflow-x: hidden;
+    background: var(--bg); color: var(--fg); min-height: 100vh; overflow-x: hidden;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px; line-height: 1.5; padding: 0 0 4rem;
   }
-  /* faint blueprint grid */
-  body::before { content: ''; position: fixed; inset: 0; z-index: -2; opacity: .05;
-    background-image: linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px);
-    background-size: 44px 44px; }
-  /* aurora blobs */
-  .aurora { position: fixed; inset: -25%; z-index: -1; filter: blur(110px); pointer-events: none; }
-  .aurora i { position: absolute; border-radius: 50%; opacity: .5; }
-  .aurora i:nth-child(1) { width: 44vw; height: 44vw; left: -8%; top: -12%;
-    background: radial-gradient(circle, rgba(88,166,255,.32), transparent 65%);
-    animation: drift1 22s ease-in-out infinite alternate; }
-  .aurora i:nth-child(2) { width: 38vw; height: 38vw; right: -6%; top: 6%;
-    background: radial-gradient(circle, rgba(163,113,247,.26), transparent 65%);
-    animation: drift2 26s ease-in-out infinite alternate; }
-  .aurora i:nth-child(3) { width: 34vw; height: 34vw; left: 26%; bottom: -16%;
-    background: radial-gradient(circle, rgba(63,185,80,.16), transparent 65%);
-    animation: drift3 30s ease-in-out infinite alternate; }
-  @keyframes drift1 { to { transform: translate(7vw, 5vh) scale(1.18); } }
-  @keyframes drift2 { to { transform: translate(-6vw, 7vh) scale(1.12); } }
-  @keyframes drift3 { to { transform: translate(5vw, -6vh) scale(1.2); } }
+  /* film grain */
+  body::after { content: ''; position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: .032;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  /* aurora + grid */
+  .fx { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+  .fx::before { content: ''; position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(148,163,197,.07) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(148,163,197,.07) 1px, transparent 1px);
+    background-size: 52px 52px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 30%, transparent 75%); }
+  .fx i { position: absolute; border-radius: 50%; filter: blur(120px); opacity: .55; }
+  .fx i:nth-child(1) { width: 46vw; height: 46vw; left: -10%; top: -18%;
+    background: radial-gradient(circle, rgba(77,159,255,.34), transparent 65%); animation: d1 24s ease-in-out infinite alternate; }
+  .fx i:nth-child(2) { width: 40vw; height: 40vw; right: -8%; top: -6%;
+    background: radial-gradient(circle, rgba(163,113,247,.3), transparent 65%); animation: d2 28s ease-in-out infinite alternate; }
+  .fx i:nth-child(3) { width: 36vw; height: 36vw; left: 30%; bottom: -20%;
+    background: radial-gradient(circle, rgba(45,212,191,.16), transparent 65%); animation: d3 32s ease-in-out infinite alternate; }
+  @keyframes d1 { to { transform: translate(8vw, 6vh) scale(1.2); } }
+  @keyframes d2 { to { transform: translate(-7vw, 8vh) scale(1.15); } }
+  @keyframes d3 { to { transform: translate(6vw, -7vh) scale(1.22); } }
 
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 1rem; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 1.25rem; }
 
-  /* ---------- header ---------- */
-  header { position: sticky; top: 0; z-index: 60; backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px); background: rgba(7,10,16,.72);
-    border-bottom: 1px solid var(--stroke); }
-  .hbar { max-width: 1120px; margin: 0 auto; padding: .85rem 1rem;
+  /* ============ header ============ */
+  header { position: sticky; top: 0; z-index: 80; border-bottom: 1px solid var(--stroke);
+    background: rgba(5,7,12,.78); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+  .hbar { max-width: 1140px; margin: 0 auto; padding: .9rem 1.25rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; }
-  .brand .icon { font-size: 1.45rem; filter: drop-shadow(0 0 10px rgba(88,166,255,.5)); }
-  .brand .t { font-size: 1.06rem; font-weight: 800; letter-spacing: .2px; }
-  .brand .t .grad { background: linear-gradient(92deg, #58a6ff 10%, #a371f7 90%);
+  .brand { display: flex; align-items: center; gap: .7rem; text-decoration: none; }
+  .logo-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(77,159,255,.2), rgba(163,113,247,.2));
+    border: 1px solid rgba(77,159,255,.35); font-size: 1.05rem;
+    box-shadow: 0 0 22px rgba(77,159,255,.22); }
+  .brand .t { font-family: var(--disp); font-size: 1.08rem; font-weight: 700; letter-spacing: .01em; }
+  .brand .t .grad { background: linear-gradient(92deg, var(--blue), var(--violet));
     -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .brand .sub { color: var(--muted2); font-size: .72rem; margin-top: .05rem; }
-  .hright { display: flex; align-items: center; gap: .7rem; }
-  .when { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-  .badge { display: inline-flex; align-items: center; gap: .4rem; font-size: .68rem;
-    font-weight: 800; letter-spacing: 1.6px; padding: .32rem .75rem; border-radius: 999px; }
-  .badge.live { color: #49d97a; background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.35);
-    box-shadow: 0 0 18px rgba(63,185,80,.15); }
-  .badge.cached { color: var(--warn); background: rgba(227,179,65,.1); border: 1px solid rgba(227,179,65,.35); }
-  .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor;
-    animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(73,217,122,.5); }
-                     50% { opacity: .5; box-shadow: 0 0 0 7px rgba(73,217,122,0); } }
+  .brand .sub { color: var(--muted2); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; margin-top: .05rem; }
+  .hright { display: flex; align-items: center; gap: .75rem; }
+  .when { color: var(--muted); font-family: var(--mono); font-size: .72rem; }
+  .badge { display: inline-flex; align-items: center; gap: .4rem; font-family: var(--mono);
+    font-size: .62rem; font-weight: 700; letter-spacing: .18em; padding: .34rem .78rem; border-radius: 999px; }
+  .badge.live { color: var(--good); background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.35);
+    box-shadow: 0 0 20px rgba(52,211,153,.14); }
+  .badge.cached { color: var(--warn); background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.35); }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pp 2s ease-in-out infinite; }
+  @keyframes pp { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52,211,153,.55); } 50% { opacity: .45; box-shadow: 0 0 0 7px rgba(52,211,153,0); } }
 
-  main { padding-top: 1.6rem; }
-  .reveal { animation: rise .7s cubic-bezier(.2,.7,.3,1) both; }
-  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  main { padding-top: 2.2rem; }
+  .reveal { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
 
-  /* ---------- glass ---------- */
-  .glass { background: var(--glass); border: 1px solid var(--stroke); border-radius: var(--r);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 14px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.045); }
+  .overline { font-family: var(--mono); font-size: .62rem; font-weight: 700; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--muted2); display: flex; align-items: center; gap: .8rem; }
+  .overline::after { content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--stroke2), transparent); }
 
-  /* ---------- hero ---------- */
-  .hero { display: flex; align-items: center; gap: 2.4rem; flex-wrap: wrap;
-    padding: 1.9rem 2.1rem; margin-bottom: 1.1rem; position: relative; overflow: hidden; }
-  .hero::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
-    background: linear-gradient(90deg, transparent, var(--vc, var(--accent)), transparent); opacity: .6; }
-  .gauge { position: relative; width: 158px; height: 158px; flex-shrink: 0; }
+  /* ============ hero ============ */
+  .hero-frame { position: relative; border-radius: 22px; padding: 1.5px; margin: 1rem 0 1.2rem;
+    background: conic-gradient(from var(--a), transparent 0deg, rgba(77,159,255,.9) 50deg, transparent 110deg,
+                transparent 200deg, rgba(163,113,247,.8) 260deg, transparent 320deg);
+    animation: spin 7s linear infinite; }
+  @keyframes spin { to { --a: 360deg; } }
+  @supports not (background: conic-gradient(from var(--a), red, blue)) {
+    .hero-frame { background: linear-gradient(135deg, rgba(77,159,255,.5), rgba(163,113,247,.5)); }
+  }
+  .hero { border-radius: 20.5px; background: linear-gradient(180deg, rgba(13,18,29,.96), rgba(8,11,19,.92));
+    backdrop-filter: blur(20px); padding: 2rem 2.3rem 1.8rem; position: relative; overflow: hidden;
+    display: flex; gap: 2.6rem; align-items: center; flex-wrap: wrap;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+  .hero .glowfield { position: absolute; width: 520px; height: 520px; border-radius: 50%; left: -160px; top: -220px;
+    background: radial-gradient(circle, var(--vc, rgba(77,159,255,.14)), transparent 65%); pointer-events: none; }
+  .hero-left { flex: 1.35 1 330px; min-width: 300px; position: relative; }
+  .big-verdict { font-family: var(--disp); font-weight: 700; font-size: clamp(3.4rem, 7vw, 5.2rem);
+    line-height: .95; letter-spacing: -.02em; margin: .8rem 0 .5rem;
+    background: linear-gradient(120deg, var(--vc1, #4d9fff) 20%, var(--vc2, #a371f7) 90%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 28px var(--vcs, rgba(77,159,255,.28))); }
+  .hero .net { font-family: var(--disp); font-size: 1.25rem; font-weight: 600; color: var(--fg); }
+  .hero .meta { color: var(--muted); font-size: .84rem; margin-top: .3rem; }
+  .hero .meta b { color: var(--fg); font-weight: 600; }
+  .hero .note { color: var(--warn); font-size: .8rem; margin-top: .55rem; }
+  .gauge { position: relative; width: 168px; height: 168px; flex-shrink: 0; }
   .gauge svg { transform: rotate(-90deg); display: block; }
-  .gauge .track { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 11; }
-  .gauge .bar { fill: none; stroke-width: 11; stroke-linecap: round;
-    transition: stroke-dashoffset 1.4s cubic-bezier(.25,.8,.3,1);
-    filter: drop-shadow(0 0 9px var(--vc, var(--accent))); }
-  .gauge .mid { position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; }
-  .gauge .num { font-size: 2.5rem; font-weight: 800; letter-spacing: -1px;
-    font-variant-numeric: tabular-nums; line-height: 1; }
-  .gauge .lbl { font-size: .6rem; color: var(--muted2); text-transform: uppercase;
-    letter-spacing: 2.2px; margin-top: .3rem; }
-  .hero-info { flex: 1 1 240px; min-width: 230px; }
-  .hero-info .net { font-size: 1.42rem; font-weight: 800; letter-spacing: -.2px; }
-  .vchip { display: inline-block; margin: .55rem 0 .4rem; padding: .22rem 1rem; border-radius: 999px;
-    font-weight: 800; font-size: .95rem; letter-spacing: 3px; }
-  .vchip.GO { color: #49d97a; border: 1.5px solid rgba(63,185,80,.6); background: rgba(63,185,80,.1);
-    box-shadow: 0 0 22px rgba(63,185,80,.18); }
-  .vchip.WARN { color: #f0c24b; border: 1.5px solid rgba(227,179,65,.6); background: rgba(227,179,65,.1);
-    box-shadow: 0 0 22px rgba(227,179,65,.15); }
-  .vchip.DEAD { color: #ff6b63; border: 1.5px solid rgba(248,81,73,.65); background: rgba(248,81,73,.1);
-    box-shadow: 0 0 26px rgba(248,81,73,.2); }
-  .hero-info .sub { color: var(--muted); font-size: .84rem; line-height: 1.55; }
-  .hero-info .note { color: var(--warn); font-size: .8rem; margin-top: .5rem; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: 1rem 1.5rem; flex: 1.3 1 300px; }
-  .stat { padding: .8rem 1rem; border-radius: 14px; background: rgba(255,255,255,.028);
-    border: 1px solid rgba(255,255,255,.05); }
-  .stat .k { color: var(--muted2); font-size: .62rem; text-transform: uppercase; letter-spacing: 1.4px; }
-  .stat .v { font-size: 1.32rem; font-weight: 800; margin-top: .28rem;
-    font-variant-numeric: tabular-nums; }
+  .gauge .track { fill: none; stroke: rgba(148,163,197,.1); stroke-width: 9; }
+  .gauge .bar { fill: none; stroke-width: 9; stroke-linecap: round;
+    transition: stroke-dashoffset 1.5s cubic-bezier(.25,.8,.3,1);
+    filter: drop-shadow(0 0 10px var(--vc, #4d9fff)); }
+  .gauge .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .gauge .num { font-family: var(--mono); font-weight: 700; font-size: 2.6rem; letter-spacing: -.06em; line-height: 1; }
+  .gauge .lbl { font-family: var(--mono); font-size: .56rem; color: var(--muted2);
+    text-transform: uppercase; letter-spacing: .32em; margin-top: .4rem; }
+  .gauge .gr { font-family: var(--mono); font-size: .8rem; font-weight: 700; margin-top: .45rem; }
 
-  /* ---------- cards ---------- */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem; margin-bottom: 1.1rem; }
-  .card { padding: 1.15rem 1.3rem; transition: transform .2s, border-color .2s, box-shadow .2s; }
-  .card:hover { transform: translateY(-3px); border-color: rgba(88,166,255,.28);
-    box-shadow: 0 18px 50px rgba(0,0,0,.5), 0 0 24px rgba(88,166,255,.07); }
-  .card .k { color: var(--muted2); font-size: .66rem; text-transform: uppercase; letter-spacing: 1.3px; }
-  .card .v { font-size: 1.7rem; font-weight: 800; margin-top: .4rem; font-variant-numeric: tabular-nums; }
-  .card .v small { font-size: .85rem; color: var(--muted); font-weight: 600; }
-  .card .d { color: var(--muted2); font-size: .74rem; margin-top: .25rem; }
+  /* stat strip */
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: .7rem;
+    flex: 1 1 340px; }
+  .stat { padding: .95rem 1.05rem; border-radius: 14px; background: rgba(148,163,197,.045);
+    border: 1px solid var(--stroke); }
+  .stat .k { font-family: var(--mono); color: var(--muted2); font-size: .58rem;
+    text-transform: uppercase; letter-spacing: .22em; }
+  .stat .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    font-size: 1.28rem; margin-top: .35rem; }
+  .stat .v small { font-size: .72rem; color: var(--muted); font-weight: 500; }
 
-  /* ---------- network sections ---------- */
-  section.net { padding: 1.5rem 1.6rem 1.4rem; margin-bottom: 1.1rem; }
-  .net-head { display: flex; align-items: baseline; justify-content: space-between;
-    gap: 1rem; flex-wrap: wrap; margin-bottom: .35rem; }
-  .net-head h2 { font-size: 1.06rem; font-weight: 800; letter-spacing: .1px; }
-  .net-head .pill { font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .net .sub { color: var(--muted2); font-size: .78rem; margin-bottom: 1.1rem; }
-  .gA { color: #49d97a; } .gB { color: #3fd0d9; } .gC { color: #f0c24b; }
-  .gD { color: #ff8a4d; } .gF { color: #ff6b63; }
+  /* ============ bento cards ============ */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .9rem; margin-bottom: 2.2rem; }
+  .card { position: relative; overflow: hidden; padding: 1.25rem 1.3rem; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(15,20,32,.72), rgba(10,14,23,.72));
+    border: 1px solid var(--stroke); backdrop-filter: blur(14px);
+    transition: transform .22s, border-color .22s; }
+  .card::before { content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+    background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(77,159,255,.1), transparent 42%);
+    transition: opacity .25s; pointer-events: none; }
+  .card:hover { transform: translateY(-3px); border-color: rgba(77,159,255,.3); }
+  .card:hover::before { opacity: 1; }
+  .card .k { font-family: var(--mono); color: var(--muted2); font-size: .6rem; text-transform: uppercase; letter-spacing: .22em; }
+  .card .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700;
+    font-size: 1.85rem; margin-top: .5rem; letter-spacing: -.02em; }
+  .card .v small { font-size: .95rem; color: var(--muted); }
+  .card .d { color: var(--muted2); font-size: .74rem; margin-top: .3rem; }
 
-  .chart-wrap { margin-bottom: 1.15rem; }
-  .chart-wrap svg { width: 100%; height: 132px; display: block; }
-  .chart-empty { color: var(--muted2); font-size: .78rem; padding: 1.4rem 0 1rem; text-align: center; }
+  /* ============ network sections ============ */
+  .seclabel { margin: 2.4rem 0 1rem; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .seclabel h2 { font-family: var(--disp); font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; }
+  .seclabel .pill { font-family: var(--mono); font-weight: 700; font-size: 1rem; padding: .18rem .8rem;
+    border-radius: 999px; border: 1px solid currentColor; }
+  .seclabel .sub { color: var(--muted2); font-size: .78rem; font-family: var(--mono); }
+  section.net { position: relative; overflow: hidden; border-radius: 20px; padding: 1.7rem 1.8rem 1.5rem;
+    background: linear-gradient(180deg, rgba(15,20,32,.6), rgba(10,14,23,.66));
+    border: 1px solid var(--stroke); backdrop-filter: blur(14px);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35); margin-bottom: 1rem; }
+  section.net::before { content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+    background: radial-gradient(460px circle at var(--mx, 50%) var(--my, 50%), rgba(77,159,255,.06), transparent 45%);
+    transition: opacity .25s; pointer-events: none; }
+  section.net:hover::before { opacity: 1; }
+  .gA { color: #34d399; } .gB { color: #2dd4bf; } .gC { color: #fbbf24; } .gD { color: #fb923c; } .gF { color: #fb7185; }
 
-  .heat-scroll { overflow-x: auto; padding-bottom: .35rem; }
-  .heat { display: grid; grid-template-columns: repeat(24, 36px); gap: 3px; min-width: 950px; }
-  .heat .h { font-size: .58rem; color: var(--muted2); text-align: center; padding-top: 2px; }
-  .cell { height: 36px; border-radius: 7px; position: relative; cursor: default;
-    border: 1px solid rgba(255,255,255,.028); transition: transform .12s; }
-  .cell:hover { transform: scale(1.16); z-index: 4; }
-  .cell.nodata { background: #141924; background-image: repeating-linear-gradient(45deg,
-    transparent 0 5px, rgba(255,255,255,.022) 5px 7px); }
-  .cell.now { outline: 2px solid rgba(238,242,248,.6); outline-offset: 1.5px; }
+  .chart-wrap { margin: .4rem 0 1.3rem; }
+  .chart-wrap svg { width: 100%; height: 150px; display: block; }
+  .chart-empty { color: var(--muted2); font-family: var(--mono); font-size: .74rem; padding: 2rem 0 1.6rem; text-align: center; }
+
+  .heat-scroll { overflow-x: auto; padding-bottom: .4rem; }
+  .heat { display: grid; grid-template-columns: repeat(24, 37px); gap: 3px; min-width: 980px; }
+  .heat .h { font-family: var(--mono); font-size: .55rem; color: var(--muted2); text-align: center; padding-top: 2px; }
+  .cell { height: 38px; border-radius: 8px; position: relative; cursor: default;
+    border: 1px solid rgba(255,255,255,.028); transition: transform .13s; }
+  .cell:hover { transform: scale(1.18); z-index: 4; }
+  .cell.nodata { background: #10151f; background-image: repeating-linear-gradient(45deg,
+    transparent 0 5px, rgba(148,163,197,.05) 5px 7px); }
+  .cell.now { outline: 2px solid rgba(242,245,251,.65); outline-offset: 1.5px; }
   .cell[data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: 118%;
-    left: 50%; transform: translateX(-50%); background: #05070b; color: var(--fg);
-    border: 1px solid rgba(255,255,255,.14); padding: .45rem .7rem; border-radius: 9px;
-    font-size: .72rem; white-space: nowrap; z-index: 9; box-shadow: 0 10px 26px rgba(0,0,0,.6); }
-  .legend { display: flex; align-items: center; gap: .55rem; margin-top: .75rem;
-    font-size: .68rem; color: var(--muted2); flex-wrap: wrap; }
-  .gradbar { height: 8px; border-radius: 4px; width: 150px;
-    background: linear-gradient(90deg, #2ea043, #9ac51e, #d29922, #db6d28, #f85149); }
-  .chips { margin-top: .75rem; font-size: .76rem; line-height: 2.2; }
-  .chip { display: inline-block; padding: .14rem .65rem; border-radius: 999px; margin-right: .4rem;
+    left: 50%; transform: translateX(-50%); background: #04060a; color: var(--fg);
+    border: 1px solid rgba(148,163,197,.2); padding: .5rem .75rem; border-radius: 10px;
+    font-family: var(--mono); font-size: .68rem; white-space: nowrap; z-index: 9;
+    box-shadow: 0 12px 30px rgba(0,0,0,.65); }
+  .legend { display: flex; align-items: center; gap: .55rem; margin-top: .8rem;
+    font-family: var(--mono); font-size: .62rem; color: var(--muted2); flex-wrap: wrap; }
+  .gradbar { height: 7px; border-radius: 4px; width: 150px;
+    background: linear-gradient(90deg, #10b981, #a3e635, #f59e0b, #f97316, #ef4444); }
+  .chips { margin-top: .8rem; font-family: var(--mono); font-size: .7rem; line-height: 2.3; }
+  .chip { display: inline-block; padding: .16rem .7rem; border-radius: 999px; margin-right: .45rem;
     font-variant-numeric: tabular-nums; }
-  .chip.good { color: #49d97a; background: rgba(63,185,80,.09); border: 1px solid rgba(63,185,80,.25); }
-  .chip.bad { color: #ff6b63; background: rgba(248,81,73,.09); border: 1px solid rgba(248,81,73,.25); }
+  .chip.good { color: #34d399; background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.25); }
+  .chip.bad { color: #fb7185; background: rgba(251,113,133,.07); border: 1px solid rgba(251,113,133,.25); }
 
-  /* ---------- incidents ---------- */
-  .tl-item { display: flex; gap: 1.05rem; padding: .75rem 0; border-left: 2px solid rgba(255,255,255,.07);
-    margin-left: .5rem; padding-left: 1.25rem; position: relative; }
-  .tl-item::before { content: ''; position: absolute; left: -6.5px; top: 1.2rem; width: 11px; height: 11px;
-    border-radius: 50%; background: var(--tc); box-shadow: 0 0 0 3.5px var(--bg), 0 0 12px var(--tc); }
-  .tl-when { color: var(--muted2); font-size: .74rem; min-width: 96px; padding-top: .2rem;
-    font-variant-numeric: tabular-nums; }
-  .tl-type { font-size: .72rem; font-weight: 800; letter-spacing: 1.2px; color: var(--tc); }
-  .tl-detail { font-size: .86rem; margin-top: .18rem; opacity: .9; }
-  .tl-empty { color: var(--muted2); padding: 1rem 0 .6rem 1.8rem; font-size: .88rem; }
+  /* ============ incidents ============ */
+  .tl-item { display: flex; gap: 1.1rem; padding: .85rem 0; border-left: 1px solid rgba(148,163,197,.12);
+    margin-left: .5rem; padding-left: 1.35rem; position: relative; }
+  .tl-item::before { content: ''; position: absolute; left: -6px; top: 1.35rem; width: 11px; height: 11px;
+    border-radius: 50%; background: var(--tc); box-shadow: 0 0 0 4px var(--bg), 0 0 14px var(--tc); }
+  .tl-when { font-family: var(--mono); color: var(--muted2); font-size: .7rem; min-width: 96px; padding-top: .25rem; }
+  .tl-type { font-family: var(--mono); font-size: .64rem; font-weight: 700; letter-spacing: .22em; color: var(--tc); }
+  .tl-detail { font-size: .88rem; margin-top: .2rem; opacity: .88; }
+  .tl-empty { color: var(--muted2); font-family: var(--mono); padding: 1.1rem 0 .6rem 1.9rem; font-size: .82rem; }
 
-  footer { color: var(--muted2); font-size: .74rem; margin-top: 2.6rem; text-align: center; line-height: 1.9; }
-  footer a { color: var(--accent); text-decoration: none; }
+  footer { color: var(--muted2); font-family: var(--mono); font-size: .68rem; margin-top: 3rem;
+    text-align: center; line-height: 2; letter-spacing: .04em; }
+  footer a { color: var(--blue); text-decoration: none; }
 
-  @media (max-width: 680px) {
-    .hero { gap: 1.3rem; padding: 1.4rem; }
-    .stats { flex-basis: 100%; }
+  @media (max-width: 700px) {
+    .hero { gap: 1.4rem; padding: 1.5rem; }
+    .strip { flex-basis: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .aurora i, .pulse, .reveal { animation: none; }
+    .fx i, .pulse, .reveal, .hero-frame { animation: none; }
   }
+  /* ?shot=1 — static mode for screenshots/testing: everything visible instantly */
+  .shot .reveal, .shot .fx i, .shot .hero-frame, .shot .pulse { animation: none !important; }
+  .shot .reveal { opacity: 1 !important; transform: none !important; }
+  .shot .bar { transition: none !important; }
 </style>
 </head>
 <body>
-<div class="aurora"><i></i><i></i><i></i></div>
+<div class="fx"><i></i><i></i><i></i></div>
 
 <header><div class="hbar">
   <a class="brand" href="#">
-    <div class="icon">📡</div>
+    <div class="logo-mark">📡</div>
     <div>
-      <div class="t"><span class="grad">NetPilot</span>&nbsp;· Live Network Health</div>
-      <div class="sub">measured locally · updated by the collector</div>
+      <div class="t"><span class="grad">NetPilot</span>&nbsp;Live</div>
+      <div class="sub">network health · measured locally</div>
     </div>
   </a>
   <div class="hright">
@@ -202,76 +237,74 @@
 </div></header>
 
 <main class="wrap">
-  <div class="hero glass reveal" id="hero"></div>
-  <div class="cards reveal" id="cards" style="animation-delay:.08s"></div>
+  <div class="overline reveal">live status — right now</div>
+  <div class="hero-frame reveal"><div class="hero" id="hero"></div></div>
+  <div class="cards reveal" id="cards" style="animation-delay:.1s"></div>
+
   <div id="nets"></div>
 
-  <section class="net glass reveal">
-    <div class="net-head"><h2>Recent incidents</h2></div>
-    <div class="sub">outages · drops · roaming · DNS failures — only real state changes are logged</div>
-    <div class="timeline" id="incidents"></div>
+  <div class="overline reveal">incident history</div>
+  <section class="net reveal" style="margin-top:1rem">
+    <div class="tl-wrap" id="incidents"></div>
   </section>
 
   <footer>
-    collected by <a href="https://github.com/Sainath-Reddy7/netpilot">NetPilot</a> — local, private, no trackers<br>
-    auto-refresh 60 s · source: <span id="src"></span>
+    collected by <a href="https://github.com/Sainath-Reddy7/netpilot">NetPilot</a> — local · private · no trackers<br>
+    auto-refresh 60s · source: <span id="src"></span>
   </footer>
 </main>
 
 <script>
+if (new URLSearchParams(location.search).get('shot') === '1')
+  document.documentElement.classList.add('shot');
 const DATA_URL = "https://gist.githubusercontent.com/Sainath-Reddy7/9242530888d662dcc51bc4cb5f89b6e7/raw/data.json";
-const EMBEDDED = {"updated": "2026-09-09T15:09:11+05:30", "now": null, "networks": [{"ssid": "Network A", "samples": 57, "median_score": 50.4, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": NaN, "loss": 100.0, "score": 44.7, "n": 40}, {"lat": NaN, "loss": 100.0, "score": 41.9, "n": 17}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network B", "samples": 1, "median_score": 28.8, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 220.2, "loss": 0.0, "score": 28.8, "n": 1}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network C", "samples": 33, "median_score": 93.8, "hourly": [{"lat": 41.7, "loss": 0.0, "score": 92.0, "n": 3}, {"lat": 41.2, "loss": 0.0, "score": 92.9, "n": 29}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 43.0, "loss": 0.0, "score": 92.0, "n": 1}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network D", "samples": 326, "median_score": 49.6, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 42.7, "loss": 99.2, "score": 49.6, "n": 310}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": NaN, "loss": 100.0, "score": 36.0, "n": 16}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}], "incidents": [{"when": "09 Sep 05:17", "type": "DNS_FAIL", "detail": "DNS resolution failing (3 hosts this cycle)."}], "availability": null};
+const EMBEDDED = {"updated": "2026-09-09T15:23:14+05:30", "now": null, "networks": [{"ssid": "Network A", "samples": 83, "median_score": 52.9, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": NaN, "loss": 100.0, "score": 44.7, "n": 40}, {"lat": NaN, "loss": 100.0, "score": 47.6, "n": 43}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network B", "samples": 1, "median_score": 28.8, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 220.2, "loss": 0.0, "score": 28.8, "n": 1}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network C", "samples": 33, "median_score": 93.8, "hourly": [{"lat": 41.7, "loss": 0.0, "score": 92.0, "n": 3}, {"lat": 41.2, "loss": 0.0, "score": 92.9, "n": 29}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 43.0, "loss": 0.0, "score": 92.0, "n": 1}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}, {"ssid": "Network D", "samples": 326, "median_score": 49.6, "hourly": [{"lat": null, "loss": null, "score": null, "n": 0}, {"lat": 42.7, "loss": 99.2, "score": 49.6, "n": 310}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": NaN, "loss": 100.0, "score": 36.0, "n": 16}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}, {"lat": null, "loss": null, "score": null, "n": 0}]}], "incidents": [{"when": "09 Sep 05:17", "type": "DNS_FAIL", "detail": "DNS resolution failing (3 hosts this cycle)."}], "availability": null};
 let DATA = EMBEDDED;
 
-const VC = { GO: '#3fb950', WARN: '#e3b341', DEAD: '#f85149' };
-const VC2 = { GO: '#3fd0d9', WARN: '#ff8a4d', DEAD: '#ff8a9b' };
-const TC = { OUTAGE: '#f85149', WIFI_DOWN: '#f85149', DNS_FAIL: '#e3b341',
-             AP_ROAM: '#58a6ff', NETWORK_CHANGE: '#58a6ff', WIFI_UP: '#3fb950' };
+const VC = { GO: '#34d399', WARN: '#fbbf24', DEAD: '#fb7185' };
+const VC2 = { GO: '#2dd4bf', WARN: '#fb923c', DEAD: '#f472b6' };
+const TC = { OUTAGE: '#fb7185', WIFI_DOWN: '#fb7185', DNS_FAIL: '#fbbf24',
+             AP_ROAM: '#4d9fff', NETWORK_CHANGE: '#4d9fff', WIFI_UP: '#34d399' };
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const gradeOf = sc => sc >= 90 ? 'A' : sc >= 75 ? 'B' : sc >= 60 ? 'C' : sc >= 40 ? 'D' : 'F';
-const gcls = sc => 'g' + gradeOf(sc);
 const fmtInt = x => Number(x).toLocaleString();
 
 function latColor(ms) {
   if (ms === null || ms === undefined) return null;
-  if (ms < 50) return '#2ea043'; if (ms < 80) return '#9ac51e';
-  if (ms < 120) return '#d29922'; if (ms < 200) return '#db6d28';
-  return '#f85149';
+  if (ms < 50) return '#10b981'; if (ms < 80) return '#a3e635';
+  if (ms < 120) return '#f59e0b'; if (ms < 200) return '#f97316';
+  return '#ef4444';
 }
 function ago(iso) {
   try {
     const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
     if (s < 90) return Math.round(s) + 's ago';
-    if (s < 5400) return Math.round(s/60) + ' min ago';
-    return Math.round(s/3600) + ' h ago';
+    if (s < 5400) return Math.round(s/60) + 'min ago';
+    return Math.round(s/3600) + 'h ago';
   } catch (e) { return '?'; }
 }
 const curHour = () => new Date().getHours();
 
-function countUp(el, target, suffix = '', dur = 950) {
+function countUp(el, target, dur = 1100) {
   const t0 = performance.now();
   const step = t => {
     const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    el.textContent = Math.round(target * e) + suffix;
+    el.textContent = Math.round(target * e);
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
-
 function stat(k, v) { return `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
 
-/* smooth 24h latency curve (Catmull-Rom -> bezier) */
 function areaChart(hourly, id) {
-  const W = 860, H = 132, padL = 10, padR = 10, padT = 14, padB = 22;
+  const W = 880, H = 150, padL = 12, padR = 12, padT = 16, padB = 24;
   const pts = hourly.map((x, h) => ({ h, v: x.lat })).filter(p => p.v !== null && p.v !== undefined);
-  if (pts.length < 3) return '<div class="chart-empty">curve appears as data accumulates…</div>';
+  if (pts.length < 3) return '<div class="chart-empty">— curve appears as data accumulates —</div>';
   const max = Math.max(...pts.map(p => p.v)) * 1.08 || 1;
   const min = Math.min(...pts.map(p => p.v)) * 0.92;
   const X = h => padL + (h / 23) * (W - padL - padR);
   const Y = v => H - padB - ((v - min) / (max - min || 1)) * (H - padT - padB);
-
-  // split into contiguous segments (hours without data break the line)
   const segs = [];
   let seg = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
@@ -279,7 +312,6 @@ function areaChart(hourly, id) {
     else { segs.push(seg); seg = [pts[i]]; }
   }
   segs.push(seg);
-
   const path = ps => {
     let d = `M ${X(ps[0].h).toFixed(1)} ${Y(ps[0].v).toFixed(1)}`;
     for (let i = 0; i < ps.length - 1; i++) {
@@ -292,42 +324,46 @@ function areaChart(hourly, id) {
   };
   const lines = segs.filter(s => s.length > 1).map(path).join(' ');
   const main = segs.reduce((a, s) => s.length > a.length ? s : a, []);
-  const area = path(main) +
-    ` L ${X(main[main.length - 1].h).toFixed(1)} ${H - padB} L ${X(main[0].h).toFixed(1)} ${H - padB} Z`;
+  const area = path(main) + ` L ${X(main[main.length - 1].h).toFixed(1)} ${H - padB} L ${X(main[0].h).toFixed(1)} ${H - padB} Z`;
   const grid = [0.25, 0.5, 0.75].map(k => {
     const y = padT + k * (H - padT - padB);
-    return `<line x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-dasharray="3 6"/>`;
+    return `<line x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}" stroke="rgba(148,163,197,.08)" stroke-dasharray="3 7"/>`;
   }).join('');
   const labels = [0, 6, 12, 18, 23].map(h =>
-    `<text x="${X(h)}" y="${H - 6}" fill="#5d6a7e" font-size="9" text-anchor="${h === 0 ? 'start' : h === 23 ? 'end' : 'middle'}">${String(h).padStart(2,'0')}</text>`).join('');
+    `<text x="${X(h)}" y="${H - 7}" fill="#5c6a80" font-size="9" font-family="JetBrains Mono, monospace" text-anchor="${h === 0 ? 'start' : h === 23 ? 'end' : 'middle'}">${String(h).padStart(2,'0')}</text>`).join('');
   const peak = pts.reduce((a, p) => p.v > a.v ? p : a, pts[0]);
-  const dot = `<circle cx="${X(peak.h)}" cy="${Y(peak.v)}" r="4" fill="#f85149" opacity=".9"/>
-    <text x="${Math.min(W - 90, X(peak.h) + 8)}" y="${Math.max(12, Y(peak.v) - 7)}" fill="#8b95a5" font-size="9">peak ${Math.round(peak.v)} ms @ ${String(peak.h).padStart(2,'0')}:00</text>`;
-
+  const dot = `<circle cx="${X(peak.h)}" cy="${Y(peak.v)}" r="4" fill="#ef4444"/>
+    <text x="${Math.min(W - 110, X(peak.h) + 9)}" y="${Math.max(13, Y(peak.v) - 8)}" fill="#9aa7bb" font-size="9" font-family="JetBrains Mono, monospace">peak ${Math.round(peak.v)}ms @${String(peak.h).padStart(2,'0')}:00</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="24 hour latency curve">
-    <defs><linearGradient id="ag${id}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#58a6ff" stop-opacity=".33"/>
-      <stop offset="1" stop-color="#58a6ff" stop-opacity="0"/></linearGradient></defs>
+    <defs>
+      <linearGradient id="ag${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#4d9fff" stop-opacity=".3"/><stop offset="1" stop-color="#4d9fff" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="ln${id}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#4d9fff"/><stop offset="1" stop-color="#a371f7"/>
+      </linearGradient>
+    </defs>
     ${grid}${labels}
     <path d="${area}" fill="url(#ag${id})"/>
-    <path d="${lines}" fill="none" stroke="#58a6ff" stroke-width="2.6" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(88,166,255,.45))"/>
+    <path d="${lines}" fill="none" stroke="url(#ln${id})" stroke-width="2.8" stroke-linecap="round" style="filter:drop-shadow(0 3px 8px rgba(77,159,255,.4))"/>
     ${dot}
   </svg>`;
 }
 
 function gaugeSvg(score, verdict) {
-  const C = 2 * Math.PI * 62;
+  const C = 2 * Math.PI * 66;
   const off = C * (1 - Math.max(0, Math.min(100, score)) / 100);
-  const c1 = VC[verdict] || '#58a6ff', c2 = VC2[verdict] || '#a371f7';
+  const c1 = VC[verdict] || '#4d9fff', c2 = VC2[verdict] || '#a371f7';
   return `<div class="gauge" style="--vc:${c1}">
-    <svg width="158" height="158" viewBox="0 0 158 158">
-      <defs><linearGradient id="ringg" x1="0" y1="0" x2="1" y2="1">
+    <svg width="168" height="168" viewBox="0 0 168 168">
+      <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
-      <circle class="track" cx="79" cy="79" r="62"></circle>
-      <circle class="bar" cx="79" cy="79" r="62" stroke="url(#ringg)"
+      <circle class="track" cx="84" cy="84" r="66"></circle>
+      <circle class="bar" cx="84" cy="84" r="66" stroke="url(#rg)"
               stroke-dasharray="${C}" stroke-dashoffset="${C}" data-off="${off}"></circle>
     </svg>
-    <div class="mid"><div class="num" id="scoreNum">0</div><div class="lbl">score</div></div>
+    <div class="mid"><div class="num" id="scoreNum">0</div><div class="lbl">score</div>
+    <div class="gr" style="color:${c1}">${gradeOf(score)} grade</div></div>
   </div>`;
 }
 
@@ -338,33 +374,34 @@ function render() {
   const n = DATA.now;
   const heroEl = document.getElementById('hero');
   if (n) {
-    const vc = VC[n.verdict] || '#58a6ff';
+    const c1 = VC[n.verdict] || '#4d9fff', c2 = VC2[n.verdict] || '#a371f7';
     const band = n.band ? ' · ' + esc(n.band) : '';
     const sig = n.signal ? ' · ' + esc(n.signal) + '% signal' : '';
     const vpn = n.vpn && n.vpn !== 'none' ? ' · VPN: ' + esc(n.vpn) : '';
     const note = n.note ? `<div class="note">⚠ ${esc(n.note)}</div>` : '';
     let extra = '';
-    if (n.bloat) extra += stat('bloat ↓ / ↑', `${esc(n.bloat.down || '–')}<br>${esc(n.bloat.up || '–')}`);
-    if (n.mtu) extra += stat('path MTU', esc(n.mtu));
-    heroEl.style.setProperty('--vc', vc);
+    if (n.bloat) extra += stat('bloat ↓/↑', `${esc(n.bloat.down || '–')}<small>/</small>${esc(n.bloat.up || '–')}`);
+    if (n.mtu) extra += stat('path mtu', esc(n.mtu));
     heroEl.innerHTML = `
-      ${gaugeSvg(n.score, n.verdict)}
-      <div class="hero-info">
-        <div class="net">${esc(n.ssid || 'unknown')}${band}${sig}${vpn}</div>
-        <div class="vchip ${esc(n.verdict)}">${esc(n.verdict)}</div>
-        <div class="sub">grade ${gradeOf(n.score)} · measured continuously from the collector machine</div>
+      <div class="glowfield" style="--vc:${c1}22"></div>
+      <div class="hero-left" style="--vc1:${c1};--vc2:${c2};--vcs:${c1}45">
+        <div class="big-verdict">${esc(n.verdict)}</div>
+        <div class="net">${esc(n.ssid || 'unknown')}${band}</div>
+        <div class="meta">${sig ? esc(n.signal) + '% signal · ' : ''}grade <b>${gradeOf(n.score)}</b> · latency <b>${n.avg_ms != null ? esc(n.avg_ms) + 'ms' : '–'}</b> · loss <b>${n.loss_pct != null ? esc(n.loss_pct) + '%' : '–'}</b>${vpn}</div>
         ${note}
       </div>
-      <div class="stats">
-        ${stat('latency', n.avg_ms != null ? esc(n.avg_ms) + ' ms' : '–')}
-        ${stat('loss', n.loss_pct != null ? esc(n.loss_pct) + '%' : '–')}
-        ${stat('jitter', n.jitter_ms != null ? esc(n.jitter_ms) + ' ms' : '–')}
+      ${gaugeSvg(n.score, n.verdict)}
+      <div class="strip">
+        ${stat('latency', n.avg_ms != null ? esc(n.avg_ms) + ' <small>ms</small>' : '–')}
+        ${stat('loss', n.loss_pct != null ? esc(n.loss_pct) + ' <small>%</small>' : '–')}
+        ${stat('jitter', n.jitter_ms != null ? esc(n.jitter_ms) + ' <small>ms</small>' : '–')}
         ${extra}
       </div>`;
     countUp(heroEl.querySelector('#scoreNum'), n.score);
+    const immediate = document.documentElement.classList.contains('shot');
     requestAnimationFrame(() => {
       const bar = heroEl.querySelector('.bar');
-      if (bar) setTimeout(() => { bar.style.strokeDashoffset = bar.dataset.off; }, 80);
+      if (bar) setTimeout(() => { bar.style.strokeDashoffset = bar.dataset.off; }, immediate ? 0 : 90);
     });
   }
 
@@ -372,11 +409,11 @@ function render() {
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
   const totalSamples = DATA.networks.reduce((a, x) => a + (x.samples || 0), 0);
   document.getElementById('cards').innerHTML = [
-    ['Networks monitored', DATA.networks.length, 'last 7 days'],
-    ['Median score', avg, 'across all networks'],
-    ['Availability', DATA.availability != null ? DATA.availability.toFixed(2) : '–', '% uptime while monitored'],
-    ['Measurements', fmtInt(totalSamples), 'probe cycles logged'],
-  ].map(([k, v, d]) => `<div class="card glass"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+    ['networks', DATA.networks.length, 'monitored · 7 days'],
+    ['median score', avg, 'across networks'],
+    ['availability', DATA.availability != null ? DATA.availability.toFixed(2) + '<small>%</small>' : '–', 'uptime while watched'],
+    ['probes', fmtInt(totalSamples), 'cycles logged'],
+  ].map(([k, v, d]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
 
   const H = curHour();
   document.getElementById('nets').innerHTML = DATA.networks.map((net, i) => {
@@ -384,42 +421,56 @@ function render() {
     const heat = net.hourly.map((x, h) => {
       const col = latColor(x.lat);
       const cls = col ? '' : ' nodata';
-      const tip = col ? `${String(h).padStart(2,'0')}:00 — ${x.lat} ms · ${x.loss}% loss · score ${x.score}` : `${String(h).padStart(2,'0')}:00 — no data yet`;
+      const tip = col ? `${String(h).padStart(2,'0')}:00 — ${x.lat}ms · ${x.loss}% loss · ${x.score}` : `${String(h).padStart(2,'0')}:00 — no data`;
       return `<div class="cell${cls}${h === H ? ' now' : ''}"${col ? ` style="background:${col}"` : ''} data-tip="${esc(tip)}"></div>`;
     }).join('');
     const good = net.hourly.map((x, h) => ({h, x})).filter(o => o.x.score != null && o.x.score >= 75).map(o => o.h);
     const dead = net.hourly.map((x, h) => ({h, x})).filter(o => o.x.score != null && o.x.score < 40).map(o => o.h);
-    const fmt = hs => hs.length ? hs.map(h => String(h).padStart(2,'0')).join(', ') : 'none';
-    return `<section class="net glass reveal" style="animation-delay:${.12 + i * .07}s">
-      <div class="net-head">
+    const fmt = hs => hs.length ? hs.map(h => String(h).padStart(2,'0')).join(' ') : 'none';
+    const num = String(i + 1).padStart(2, '0');
+    return `<div class="reveal" style="animation-delay:${.12 + i * .08}s">
+      <div class="seclabel">
+        <span class="overline" style="flex:0 0 auto">net ${num}</span>
         <h2>${esc(net.ssid)}</h2>
-        <span class="pill ${gcls(net.median_score)}">${net.median_score} · ${g}</span>
+        <span class="pill g${g}">${net.median_score} · ${g}</span>
+        <span class="sub">${fmtInt(net.samples)} samples</span>
       </div>
-      <div class="sub">${fmtInt(net.samples)} samples · 24 h latency curve · per-hour heatmap (current hour outlined)</div>
-      <div class="chart-wrap">${areaChart(net.hourly, i)}</div>
-      <div class="heat-scroll"><div class="heat">
-        ${Array.from({length: 24}, (_, h) => `<div class="h">${String(h).padStart(2,'0')}</div>`).join('')}${heat}
-      </div></div>
-      <div class="legend"><span>fast</span><div class="gradbar"></div><span>slow / lossy</span>
-        <span style="opacity:.7">▨&nbsp;= no data yet</span></div>
-      <div class="chips">
-        <span class="chip good">healthy: ${fmt(good)}</span>
-        <span class="chip bad">dead: ${fmt(dead)}</span>
-      </div>
-    </section>`;
+      <section class="net">
+        <div class="chart-wrap">${areaChart(net.hourly, i)}</div>
+        <div class="heat-scroll"><div class="heat">
+          ${Array.from({length: 24}, (_, h) => `<div class="h">${String(h).padStart(2,'0')}</div>`).join('')}${heat}
+        </div></div>
+        <div class="legend"><span>fast</span><div class="gradbar"></div><span>slow</span><span>▨ no data</span></div>
+        <div class="chips">
+          <span class="chip good">healthy ${fmt(good)}</span>
+          <span class="chip bad">dead ${fmt(dead)}</span>
+        </div>
+      </section>
+    </div>`;
   }).join('');
 
   document.getElementById('incidents').innerHTML = DATA.incidents.length
     ? DATA.incidents.map(e => `
-      <div class="tl-item" style="--tc: ${TC[e.type] || '#93a0b4'}">
+      <div class="tl-item" style="--tc: ${TC[e.type] || '#9aa7bb'}">
         <div class="tl-when">${esc(e.when)}</div>
         <div>
           <div class="tl-type">${esc(e.type.replace(/_/g, ' '))}</div>
           <div class="tl-detail">${esc(e.detail)}</div>
         </div>
       </div>`).join('')
-    : '<div class="tl-empty">No incidents logged — that\'s a good thing.</div>';
+    : '<div class="tl-empty">no incidents — that\'s a good thing</div>';
 }
+
+/* spotlight hover */
+document.addEventListener('pointermove', e => {
+  for (const el of document.querySelectorAll('.card, section.net')) {
+    const r = el.getBoundingClientRect();
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+      el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }
+  }
+}, { passive: true });
 
 function setBadge(live) {
   const b = document.getElementById('badge');
@@ -433,7 +484,7 @@ async function loadLive() {
     if (!res.ok) throw new Error(res.status);
     DATA = await res.json();
     setBadge(true);
-    document.getElementById('src').textContent = 'live from collector';
+    document.getElementById('src').textContent = 'live collector';
   } catch (e) {
     setBadge(false);
     document.getElementById('src').textContent = 'embedded snapshot';
