@@ -1,16 +1,18 @@
 # NetPilot 📡
 
 [![CI](https://github.com/Sainath-Reddy7/netpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Sainath-Reddy7/netpilot/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen)](#tests)
+[![Tests](https://img.shields.io/badge/tests-41%20passing-brightgreen)](#tests)
+[![Live site](https://img.shields.io/website?url=https%3A%2F%2Fnetpilot-nine.vercel.app&label=live%20dashboard)](https://netpilot-nine.vercel.app)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-windows-blueviolet)](https://github.com)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**A comprehensive network health monitor for Windows** — built after two days of
-fighting hostel Wi-Fi and mobile hotspot congestion. NetPilot measures everything
-that actually makes a network *feel* bad, tells you exactly **which layer is the
-problem**, learns **when your networks are usable** over time, and can publish a
-**shareable web dashboard** of it all.
+**A comprehensive, self-updating network health monitor for Windows.** Built
+after two days of fighting hostel Wi-Fi and mobile hotspot congestion. NetPilot
+measures everything that actually makes a network *feel* bad, tells you exactly
+**which layer is the problem**, learns **when your networks are usable**, and
+**live-publishes it all to a website that updates itself** —
+[demo deployment](https://netpilot-nine.vercel.app).
 
 > Speedtests measure Mbps. NetPilot measures what hurts: latency, jitter, packet
 > loss, bufferbloat (both directions), DNS behavior, radio congestion — layer by layer.
@@ -73,9 +75,9 @@ python netpilot.py --full             # deep diagnostics (~2 min: traceroute, bi
                                       #   bloat, throughput, path MTU, channel scan, VPN)
 python netpilot.py --report           # heatmap + schedules + incidents + trends + HTML
 python netpilot.py --report --days 14
-python netpilot.py --publish          # web dashboard -> web/index.html (real data)
-python netpilot.py --publish --demo   # web dashboard with synthetic demo data
-python netpilot.py --publish --anon   # real data, network names pseudonymized
+python netpilot.py --sync --headless  # background collector + live website sync
+python netpilot.py --sync-now         # one measurement + push to the website, then exit
+python netpilot.py --publish --anon   # regenerate the deployed site's embedded snapshot
 python netpilot.py --auto "MyHotspot" # auto-switch to a saved Wi-Fi after 30s of DEAD
 python netpilot.py --deep-interval 15 # live mode: deep diagnostics every 15 min
 ```
@@ -84,21 +86,43 @@ python netpilot.py --deep-interval 15 # live mode: deep diagnostics every 15 min
 running when you care, check `--report` after a few days, and `--publish` when
 you want receipts.
 
-## Web dashboard & Vercel deployment
+## Live web dashboard (self-updating)
 
-The web dashboard is a **single self-contained HTML file** — inline CSS/JS,
-no CDNs, no trackers, works offline. Hosting it on Vercel takes ~2 minutes:
+The deployed site shows **real, live data** — no demo, no manual publishing:
 
-1. `python netpilot.py --publish` (or `--demo` / `--anon`) — generates `web/index.html`
-2. Commit & push to GitHub (this repo)
-3. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import this repo
-4. Framework preset: **Other** — `vercel.json` already points Vercel at `web/`
-5. Deploy. Done — every push redeploys automatically.
+```
+ collector (your laptop, background)          website (Vercel)
+ ┌───────────────────────────────┐            ┌──────────────────────────┐
+ │ netpilot.py --sync --headless │  every     │  index.html fetches      │
+ │  · probes every ~10 s         │  10 min    │  data.json from the raw  │
+ │  · logs CSV + incidents       │ ────────▶  │  GitHub `data` branch    │
+ │  · pushes web/data.json       │  GitHub    │  and re-renders itself   │
+ └───────────────────────────────┘  API       │  every 60 s  🟢 LIVE     │
+                                             └──────────────────────────┘
+```
 
-**Privacy:** logs stay in `logs/` (git-ignored) and never leave your machine.
-Only what you explicitly `--publish` goes to the web. Use `--demo` for a public
-showcase, `--anon` to hide network names, or publish real data only to private
-deployments.
+- **No rebuilds, no deploy limits** — data flows through the repo's `data`
+  branch; the static site fetches it client-side.
+- **RIGHT NOW hero card** — current verdict/score/latency/loss/jitter,
+  bloat grades, path MTU, VPN state; auto-refreshes every 60 s.
+- **ICMP-block honesty** — if a network blocks ping entirely (some campuses
+  do), the site says so instead of lying "DEAD".
+
+Setup:
+
+```bash
+python scripts/start-collector.bat        # start the background collector now
+# auto-start at login: copy scripts/netpilot-collector.vbs into
+#   %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+```
+
+Deploy your own (2 min): `python netpilot.py --publish --anon` → commit & push
+→ [vercel.com](https://vercel.com) → Add New → Import repo → Deploy
+(`vercel.json` already points at `web/`; production is static).
+
+**Privacy:** the collector pseudonymizes SSIDs (`Network A/B/...`) before
+anything leaves your machine — flip `sync.anonymize` in the config if you want
+real names. Raw logs never leave `logs/`.
 
 ## Scoring
 
@@ -172,8 +196,9 @@ events.py       incident detection (outages, roaming, DNS fails) + timeline
 logger.py       CSV logging (schema v2, auto-migrates v1 files)
 report.py       heatmap, schedules, incidents, trends, availability, HTML export
 notify.py       Discord webhook + toast + console alerts
-web.py          --publish: self-contained shareable web dashboard
-scripts/        maintenance (README screenshot generation)
+sync.py         live-sync: payload builder + GitHub data-branch pusher
+web.py          --publish: live-fetching web dashboard (single HTML file)
+scripts/        collector launcher + screenshot generation
 tests/          pytest suite (real captured tool output)
 web/            published dashboard (what Vercel serves)
 ```

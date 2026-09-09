@@ -93,6 +93,40 @@ def make_engine(cfg: dict) -> Engine:
     )
 
 
+def build_now_state(state: dict) -> dict:
+    """Compact 'what is happening right now' dict for the live website."""
+    net = state.get("net_snap")
+    ov = state.get("overall")
+    wifi = state.get("wifi") or {}
+    vpn = state.get("vpn")
+    bloat = state.get("bloat")
+    mtu = state.get("mtu")
+    now = {
+        "ssid": wifi.get("ssid") or "wired/unknown",
+        "band": wifi.get("band"),
+        "signal": wifi.get("signal"),
+        "verdict": ov.verdict if ov else "n/a",
+        "score": ov.overall_score if ov else 0,
+        "avg_ms": round(net.avg_ms) if net and net.avg_ms is not None else None,
+        "loss_pct": round(net.loss_pct, 1) if net else None,
+        "jitter_ms": round(net.jitter_ms) if net and net.jitter_ms is not None else None,
+        "vpn": vpn.label if vpn else "",
+    }
+    if bloat and bloat.tested:
+        now["bloat"] = {
+            "down": f"+{bloat.delta_ms:.0f}ms {bloat.grade}" if bloat.delta_ms is not None else None,
+            "up": f"+{bloat.up_delta_ms:.0f}ms {bloat.up_grade}" if bloat.up_delta_ms is not None else None,
+        }
+    if mtu and mtu.path_mtu:
+        now["mtu"] = mtu.path_mtu
+    # All pings dead but DNS/TCP still resolving -> this network blocks ICMP;
+    # screaming DEAD would be a lie, so annotate instead.
+    dns = state.get("dns")
+    if net and net.loss_pct >= 99 and dns is not None and dns.avg_ms is not None:
+        now["note"] = "ping (ICMP) appears blocked on this network — DNS/TCP still work; treat with caution"
+    return now
+
+
 def run_light(engine: Engine) -> dict:
     """One light cycle: wifi + gateway + pings + DNS. Returns dashboard state."""
     cfg = engine.cfg
@@ -265,87 +299,116 @@ def once(engine: Engine, deep: bool = False) -> int:
     return {GO: 0, "WARN": 1, DEAD: 2}.get(state["overall"].verdict, 2)
 
 
-def monitor(engine: Engine, auto_ssid: str | None, deep_interval_min: float) -> None:
+def monitor(engine: Engine, auto_ssid: str | None, deep_interval_min: float, sync: bool = False, headless: bool = False) -> None:
     cfg = engine.cfg
+    sync_cfg = cfg.get("sync") or {}
+    sync_enabled = sync or bool(sync_cfg.get("enabled"))
     alert_state = {"alerted_dead": False}
     dead_since: float | None = None
     last_switch = 0.0
+    last_sync = 0.0
     started = time.time()
     min_score = 100.0
     cycles = 0
 
-    console.print(
-        Panel(
-            "Monitoring continuously — Ctrl+C to stop.\n"
-            + (
-                f"Auto-switch to [bold]{auto_ssid}[/bold] [green]ARMED[/green] after "
-                f"{cfg['dead_sustain_s']}s of DEAD. "
-                if auto_ssid
-                else "Alert-only mode (no automatic switching). "
+    if not headless:
+        console.print(
+            Panel(
+                "Monitoring continuously — Ctrl+C to stop.\n"
+                + (
+                    f"Auto-switch to [bold]{auto_ssid}[/bold] [green]ARMED[/green] after "
+                    f"{cfg['dead_sustain_s']}s of DEAD. "
+                    if auto_ssid
+                    else "Alert-only mode (no automatic switching). "
+                )
+                + f"Deep diagnostics every {deep_interval_min:.0f} min."
+                + (" [bold]Live sync ON[/bold] — website updates itself." if sync_enabled else ""),
+                title="NetPilot v2",
             )
-            + f"Deep diagnostics every {deep_interval_min:.0f} min.",
-            title="NetPilot v2",
         )
-    )
+
+    live_ctx = Live(console=console, refresh_per_second=2) if not headless else None
+
+    def _log(msg: str) -> None:
+        if not headless:
+            console.print(msg)
 
     try:
-        with Live(console=console, refresh_per_second=2) as live:
-            while True:
-                state = run_light(engine)
-                cycles += 1
-                min_score = min(min_score, state["overall"].overall_score)
-                live.update(build_dashboard(state))
+        if live_ctx:
+            live_ctx.start()
+        while True:
+            state = run_light(engine)
+            cycles += 1
+            min_score = min(min_score, state["overall"].overall_score)
+            if live_ctx:
+                live_ctx.update(build_dashboard(state))
 
-                now = time.time()
-                # ---- alerts (tied to the internet path, the switch-worthy signal)
-                path_verdict = state["net_snap"].verdict
-                if path_verdict == DEAD:
-                    if dead_since is None:
-                        dead_since = now
-                    sustained = now - dead_since >= cfg["dead_sustain_s"]
-                    if sustained and not alert_state["alerted_dead"]:
-                        avg_txt = f"{state['net_snap'].avg_ms:.0f}ms" if state["net_snap"].avg_ms is not None else "n/a"
-                        notify(
-                            "NetPilot: network is DEAD",
-                            f"{state['wifi'].get('ssid') or 'network'} — "
-                            f"{state['net_snap'].loss_pct:.0f}% loss, "
-                            f"{avg_txt} avg. {state['diagnosis']}",
-                        )
-                        alert_state["alerted_dead"] = True
-                    if (
-                        sustained
-                        and auto_ssid
-                        and now - last_switch >= cfg["auto_switch_cooldown_s"]
-                        and auto_ssid in get_visible_networks()
-                    ):
-                        console.print(f"[yellow]Attempting auto-switch to '{auto_ssid}'...[/yellow]")
-                        if try_switch_to_ssid(auto_ssid):
-                            last_switch = now
-                            dead_since = None
-                            alert_state["alerted_dead"] = False
-                            notify("NetPilot: switched network", f"Connected to {auto_ssid}.", style="green")
-                        else:
-                            last_switch = now
-                else:
-                    if alert_state["alerted_dead"]:
-                        notify(
-                            "NetPilot: network recovered",
-                            f"{state['wifi'].get('ssid') or 'network'} back to "
-                            f"{path_verdict} ({state['net_snap'].score:.0f}/100).",
-                            style="green",
-                        )
-                    alert_state["alerted_dead"] = False
-                    dead_since = None
+            now = time.time()
 
-                # ---- periodic deep diagnostics (blocks the loop ~1 min)
-                if now - engine.last_deep_ts >= deep_interval_min * 60:
+            # ---- live sync (website updates) ----
+            if sync_enabled and now - last_sync >= sync_cfg.get("interval_min", 10) * 60:
+                last_sync = now
+                try:
+                    from sync import sync_once
+
+                    ok, msg = sync_once(sync_cfg, build_now_state(state))
+                    _log(f"[dim]sync: {msg}[/dim]" if ok else f"[yellow]sync failed: {msg}[/yellow]")
+                except Exception as exc:
+                    _log(f"[yellow]sync error: {exc}[/yellow]")
+
+            # ---- alerts (tied to the internet path, the switch-worthy signal)
+            path_verdict = state["net_snap"].verdict
+            if path_verdict == DEAD:
+                if dead_since is None:
+                    dead_since = now
+                sustained = now - dead_since >= cfg["dead_sustain_s"]
+                if sustained and not alert_state["alerted_dead"]:
+                    avg_txt = f"{state['net_snap'].avg_ms:.0f}ms" if state["net_snap"].avg_ms is not None else "n/a"
+                    notify(
+                        "NetPilot: network is DEAD",
+                        f"{state['wifi'].get('ssid') or 'network'} — "
+                        f"{state['net_snap'].loss_pct:.0f}% loss, "
+                        f"{avg_txt} avg. {state['diagnosis']}",
+                    )
+                    alert_state["alerted_dead"] = True
+                if (
+                    sustained
+                    and auto_ssid
+                    and now - last_switch >= cfg["auto_switch_cooldown_s"]
+                    and auto_ssid in get_visible_networks()
+                ):
+                    _log(f"[yellow]Attempting auto-switch to '{auto_ssid}'...[/yellow]")
+                    if try_switch_to_ssid(auto_ssid):
+                        last_switch = now
+                        dead_since = None
+                        alert_state["alerted_dead"] = False
+                        notify("NetPilot: switched network", f"Connected to {auto_ssid}.", style="green")
+                    else:
+                        last_switch = now
+            else:
+                if alert_state["alerted_dead"]:
+                    notify(
+                        "NetPilot: network recovered",
+                        f"{state['wifi'].get('ssid') or 'network'} back to "
+                        f"{path_verdict} ({state['net_snap'].score:.0f}/100).",
+                        style="green",
+                    )
+                alert_state["alerted_dead"] = False
+                dead_since = None
+
+            # ---- periodic deep diagnostics (blocks the loop ~1 min)
+            if now - engine.last_deep_ts >= deep_interval_min * 60:
+                if live_ctx:
                     state["header_line"] += " · [deep diagnostics running…]"
-                    live.update(build_dashboard(state))
-                    run_deep(engine)
+                    live_ctx.update(build_dashboard(state))
+                run_deep(engine)
 
-                time.sleep(cfg["interval_s"])
+            time.sleep(cfg["interval_s"])
     except KeyboardInterrupt:
         pass
+    finally:
+        if live_ctx:
+            live_ctx.stop()
 
     mins = (time.time() - started) / 60
     console.print(
@@ -364,12 +427,15 @@ def main() -> int:
     mode.add_argument("--full", action="store_true", help="single DEEP check (traceroute, bloat, MTU, channel scan)")
     mode.add_argument("--report", action="store_true", help="build report from logs")
     mode.add_argument("--publish", action="store_true", help="generate shareable web dashboard (web/index.html)")
+    mode.add_argument("--sync-now", action="store_true", help="push current data to the website once, then exit")
     parser.add_argument("--version", action="version", version=f"netpilot {__version__}")
     parser.add_argument("--days", type=int, default=7, help="days of history for --report/--publish (default 7)")
     parser.add_argument("--demo", action="store_true", help="with --publish: use synthetic demo data (no real SSIDs)")
     parser.add_argument("--anon", action="store_true", help="with --publish: pseudonymize network names")
     parser.add_argument("--no-html", action="store_true", help="skip HTML report export")
-    parser.add_argument("--auto", metavar="SSID", help="auto-switch to this saved Wi-Fi when path is DEAD")
+    parser.add_argument("--auto", metavar="SSID", help="auto-switch to a saved Wi-Fi when path is DEAD")
+    parser.add_argument("--sync", action="store_true", help="live-sync the website while monitoring")
+    parser.add_argument("--headless", action="store_true", help="no dashboard UI (background collector mode)")
     parser.add_argument("--deep-interval", type=float, default=None, metavar="MIN", help="minutes between deep diagnostics in live mode")
     parser.add_argument("--interval", type=int, help="seconds between light cycles (default from config)")
     parser.add_argument("--no-log", action="store_true", help="don't append results to CSV")
@@ -406,8 +472,16 @@ def main() -> int:
         return once(engine, deep=False)
     if args.full:
         return once(engine, deep=True)
+    if args.sync_now:
+        from sync import sync_once
 
-    monitor(engine, args.auto, deep_interval)
+        # Take one fresh measurement so the site's "RIGHT NOW" card is current.
+        state = run_light(engine)
+        ok, msg = sync_once(cfg.get("sync") or {}, now_state=build_now_state(state))
+        console.print(f"[green]sync: {msg}[/green]" if ok else f"[red]sync failed: {msg}[/red]")
+        return 0 if ok else 1
+
+    monitor(engine, args.auto, deep_interval, sync=args.sync, headless=args.headless)
     return 0
 
 

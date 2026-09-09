@@ -2,7 +2,7 @@
   "interval_s": 5,
   "pings_per_probe": 3,
   "ping_timeout_ms": 1500,
-  "targets": ["1.1.1.1", "8.8.8.8"],
+  "targets": ["1.1.1.1", "8.8.8.8", "9.9.9.9"],
   "window_cycles": 6,
 
   "dns": {
@@ -49,6 +49,15 @@
 
   "alerts": {
     "webhook_url": null
+  },
+
+  "sync": {
+    "enabled": false,
+    "interval_min": 10,
+    "anonymize": true,
+    "repo": "Sainath-Reddy7/netpilot",
+    "branch": "data",
+    "path": "web/data.json"
   },
 
   "deep_interval_min": 30,
