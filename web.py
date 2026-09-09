@@ -89,6 +89,12 @@ HTML_SHELL = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05070c">
+<meta name="description" content="Live network health monitor — latency, packet loss, bufferbloat and congestion heatmaps, measured locally and updated continuously.">
+<meta property="og:title" content="NetPilot — Live Network Health">
+<meta property="og:description" content="Real-time latency, loss, bufferbloat and per-hour congestion heatmaps from a local collector.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <title>NetPilot — Live Network Health</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -293,8 +299,16 @@ HTML_SHELL = r"""<!DOCTYPE html>
   footer a { color: var(--blue); text-decoration: none; }
 
   @media (max-width: 700px) {
-    .hero { gap: 1.4rem; padding: 1.5rem; }
-    .strip { flex-basis: 100%; }
+    .hero { gap: 1.3rem; padding: 1.3rem 1.1rem; border-radius: 16px; }
+    .hero-frame { border-radius: 17px; }
+    .strip { flex-basis: 100%; grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); gap: .5rem; }
+    .stat { min-width: 0; padding: .68rem .6rem; border-radius: 11px; }
+    .stat .v { font-size: 1.02rem; overflow-wrap: anywhere; }
+    .stat .k { font-size: .52rem; letter-spacing: .14em; }
+    .gauge { width: 138px; height: 138px; }
+    .gauge svg { width: 138px; height: 138px; }
+    .gauge .num { font-size: 2rem; }
+    .big-verdict { font-size: clamp(2.6rem, 12vw, 3.4rem); }
   }
   @media (prefers-reduced-motion: reduce) {
     .fx i, .pulse, .reveal, .hero-frame, .tick-in, .ekg path { animation: none; }
@@ -530,7 +544,16 @@ function render() {
 
   const n = DATA.now;
   const heroEl = document.getElementById('hero');
-  if (n) {
+  if (!n) {
+    // No live snapshot yet — show an honest waiting state, never an empty box
+    heroEl.innerHTML = `
+      <div class="glowfield"></div>
+      <div class="hero-left" style="--vc1:#4d9fff;--vc2:#a371f7;--vcs:rgba(77,159,255,.28)">
+        <div class="big-verdict" style="font-size:clamp(2rem,4vw,3rem)">STANDBY</div>
+        <div class="net">waiting for the first live update from the collector</div>
+        <div class="meta">history below is from logged data · the LIVE badge turns green when fresh data arrives</div>
+      </div>`;
+  } else {
     const c1 = VC[n.verdict] || '#4d9fff', c2 = VC2[n.verdict] || '#a371f7';
     const band = n.band ? ' · ' + esc(n.band) : '';
     const sig = n.signal ? ' · ' + esc(n.signal) + '% signal' : '';
