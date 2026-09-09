@@ -297,12 +297,47 @@ HTML_SHELL = r"""<!DOCTYPE html>
     .strip { flex-basis: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .fx i, .pulse, .reveal, .hero-frame { animation: none; }
+    .fx i, .pulse, .reveal, .hero-frame, .tick-in, .ekg path { animation: none; }
+    .ekg path { stroke-dashoffset: 0; opacity: .25; }
   }
+  /* ============ live ticker ============ */
+  .ticker { overflow: hidden; border-block: 1px solid var(--stroke);
+    background: rgba(5,7,12,.62); backdrop-filter: blur(8px); margin-bottom: 1.5rem; }
+  .tick-in { display: inline-flex; white-space: nowrap; will-change: transform;
+    padding: .58rem 0; font-family: var(--mono); font-size: .66rem; font-weight: 500;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--muted);
+    animation: marquee 38s linear infinite; }
+  .ticker:hover .tick-in { animation-play-state: paused; }
+  .tick-in span { padding: 0 1.6rem; }
+  .tick-in b { color: var(--fg); font-weight: 700; }
+  .tick-in .ok { color: var(--good); } .tick-in .no { color: var(--bad); } .tick-in .wm { color: var(--warn); }
+  .tick-in i { font-style: normal; color: var(--muted2); }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+
+  /* ============ ekg heartbeat ============ */
+  .ekg { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; width: 100%;
+    opacity: .5; pointer-events: none; }
+  .ekg path { fill: none; stroke: var(--vc, #4d9fff); stroke-width: 1.6;
+    stroke-dasharray: 700; stroke-dashoffset: 1400;
+    animation: ekg 3.2s linear infinite;
+    filter: drop-shadow(0 0 6px var(--vc, #4d9fff)); }
+  @keyframes ekg { to { stroke-dashoffset: 0; } }
+
+  /* fresh-data sweep */
+  .hero.fresh::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgba(77,159,255,.09) 50%, transparent 70%);
+    transform: translateX(-120%); animation: sweep 1.1s ease-out; }
+  @keyframes sweep { to { transform: translateX(120%); } }
+
+  /* value bump when a number changes */
+  .bump { animation: bump .55s cubic-bezier(.2,.7,.3,1); }
+  @keyframes bump { 30% { transform: scale(1.1); color: var(--blue); text-shadow: 0 0 16px rgba(77,159,255,.65); } }
+
   /* ?shot=1 — static mode for screenshots/testing: everything visible instantly */
-  .shot .reveal, .shot .fx i, .shot .hero-frame, .shot .pulse { animation: none !important; }
+  .shot .reveal, .shot .fx i, .shot .hero-frame, .shot .pulse, .shot .tick-in, .shot .ekg path { animation: none !important; }
   .shot .reveal { opacity: 1 !important; transform: none !important; }
   .shot .bar { transition: none !important; }
+  .shot .ekg path { stroke-dashoffset: 0; }
 </style>
 </head>
 <body>
@@ -323,6 +358,7 @@ HTML_SHELL = r"""<!DOCTYPE html>
 </div></header>
 
 <main class="wrap">
+  <div class="ticker reveal" id="ticker" style="margin-top:1.6rem"><div class="tick-in" id="tickIn"></div></div>
   <div class="overline reveal">live status — right now</div>
   <div class="hero-frame reveal"><div class="hero" id="hero"></div></div>
   <div class="cards reveal" id="cards" style="animation-delay:.1s"></div>
@@ -453,7 +489,42 @@ function gaugeSvg(score, verdict) {
   </div>`;
 }
 
+const seenVals = {};
+function bumpChanged() {
+  for (const el of document.querySelectorAll('.stat .v, .card .v')) {
+    const holder = el.closest('.stat') || el.closest('.card');
+    const k = holder ? (holder.querySelector('.k')?.textContent || '') : '';
+    if (k) {
+      if (seenVals[k] !== undefined && seenVals[k] !== el.textContent) {
+        el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+      }
+      seenVals[k] = el.textContent;
+    }
+  }
+}
+
+function renderTicker() {
+  const nn = DATA.now;
+  const t = [];
+  if (nn) {
+    const cls = nn.verdict === 'GO' ? 'ok' : nn.verdict === 'DEAD' ? 'no' : 'wm';
+    t.push(`<b class="${cls}">● ${esc(nn.verdict)}</b>`);
+    t.push(`score <b>${esc(nn.score)}</b>`);
+    t.push(`${esc(nn.ssid || 'unknown')}`);
+    t.push(`latency <b>${nn.avg_ms != null ? esc(nn.avg_ms) + 'ms' : '–'}</b>`);
+    t.push(`loss <b>${nn.loss_pct != null ? esc(nn.loss_pct) + '%' : '–'}</b>`);
+    t.push(`jitter <b>${nn.jitter_ms != null ? esc(nn.jitter_ms) + 'ms' : '–'}</b>`);
+  }
+  if (DATA.networks.length) t.push(`<b>${DATA.networks.length}</b> networks tracked`);
+  if (DATA.availability != null) t.push(`availability <b>${DATA.availability.toFixed(1)}%</b>`);
+  t.push(`<i>measured locally · refreshes every 60s</i>`);
+  const half = t.map(x => `<span>${x}</span>`).join('<i> ✦ </i>');
+  document.getElementById('tickIn').innerHTML = half + '<i> ✦ </i>' + half + '<i> ✦ </i>';
+  document.title = `NetPilot · ${nn ? nn.verdict + ' ' + Math.round(nn.score) + ' · ' : ''}LIVE`;
+}
+
 function render() {
+  renderTicker();
   document.getElementById('meta').textContent =
     'updated ' + ago(DATA.updated) + (DATA.demo ? ' · DEMO' : '');
 
@@ -470,6 +541,9 @@ function render() {
     if (n.mtu) extra += stat('path mtu', esc(n.mtu));
     heroEl.innerHTML = `
       <div class="glowfield" style="--vc:${c1}22"></div>
+      <svg class="ekg" viewBox="0 0 900 44" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 26 H120 l10 0 6 -14 8 28 6 -14 H320 l10 0 6 -14 8 28 6 -14 H560 l10 0 6 -14 8 28 6 -14 H900"/>
+      </svg>
       <div class="hero-left" style="--vc1:${c1};--vc2:${c2};--vcs:${c1}45">
         <div class="big-verdict">${esc(n.verdict)}</div>
         <div class="net">${esc(n.ssid || 'unknown')}${band}</div>
@@ -483,6 +557,7 @@ function render() {
         ${stat('jitter', n.jitter_ms != null ? esc(n.jitter_ms) + ' <small>ms</small>' : '–')}
         ${extra}
       </div>`;
+    heroEl.style.setProperty('--vc', c1);
     countUp(heroEl.querySelector('#scoreNum'), n.score);
     const immediate = document.documentElement.classList.contains('shot');
     requestAnimationFrame(() => {
@@ -545,6 +620,8 @@ function render() {
         </div>
       </div>`).join('')
     : '<div class="tl-empty">no incidents — that\'s a good thing</div>';
+
+  bumpChanged();
 }
 
 /* spotlight hover */
@@ -571,6 +648,8 @@ async function loadLive() {
     DATA = await res.json();
     setBadge(true);
     document.getElementById('src').textContent = 'live collector';
+    const hero = document.getElementById('hero');
+    hero.classList.remove('fresh'); void hero.offsetWidth; hero.classList.add('fresh');
   } catch (e) {
     setBadge(false);
     document.getElementById('src').textContent = 'embedded snapshot';

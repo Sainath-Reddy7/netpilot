@@ -116,6 +116,8 @@ def build_payload(
             score_col = "overall_score" if "overall_score" in df.columns else "net_score"
 
             for ssid, g in df.groupby("ssid"):
+                if len(g) < 10:
+                    continue  # drive-by networks with a handful of samples are noise
                 hourly = []
                 for h in range(24):
                     rows = g[g["hour"] == h]
@@ -258,6 +260,14 @@ def sync_once(cfg_sync: dict, now_state: dict | None = None) -> tuple[bool, str]
         anonymize=cfg_sync.get("anonymize", True),
         now_state=now_state,
     )
+    # If pings are dying but THIS payload reaches GitHub, TCP internet is
+    # provably working — say so instead of letting a bare "DEAD" mislead.
+    now = payload.get("now") or {}
+    if now.get("loss_pct") is not None and now["loss_pct"] >= 99:
+        now["note"] = (
+            "ping (ICMP) is blocked on this network — TCP internet confirmed working "
+            "(this update arrived over HTTPS), so ping-based scores understate reality here"
+        )
     return push_payload(
         payload,
         cfg_sync.get("repo", "Sainath-Reddy7/netpilot"),

@@ -8,15 +8,20 @@ import sync
 
 @pytest.fixture()
 def sample_logs(tmp_path, monkeypatch):
-    """Fabricate a small v2 CSV + events CSV in a temp dir."""
+    """Fabricate a small v2 CSV + events CSV in a temp dir (networks >=10 rows
+    so they survive the tiny-network filter)."""
     csv = tmp_path / "netpilot.csv"
-    rows = [
-        "timestamp,ssid,net_avg_ms,net_loss_pct,net_jitter_ms,net_p95_ms,overall_score,net_score,verdict",
-        "2026-09-08T10:00:00,HomeWifi,40.0,0.0,3.0,50.0,95.0,95.0,GO",
-        "2026-09-08T21:00:00,HomeWifi,180.0,5.0,40.0,300.0,30.0,30.0,DEAD",
-        "2026-09-08T11:00:00,CampusNet,55.0,0.5,6.0,70.0,85.0,85.0,GO",
-    ]
-    csv.write_text("\n".join(rows), encoding="utf-8")
+    header = "timestamp,ssid,net_avg_ms,net_loss_pct,net_jitter_ms,net_p95_ms,overall_score,net_score,verdict"
+    rows = []
+    for i in range(10):
+        rows.append(f"2026-09-08T10:{i:02d}:00,HomeWifi,40.0,0.0,3.0,50.0,95.0,95.0,GO")
+    for i in range(10):
+        rows.append(f"2026-09-08T21:{i:02d}:00,HomeWifi,180.0,5.0,40.0,300.0,30.0,30.0,DEAD")
+    for i in range(10):
+        rows.append(f"2026-09-08T11:{i:02d}:00,CampusNet,55.0,0.5,6.0,70.0,85.0,85.0,GO")
+    # a drive-by network that must be filtered out
+    rows.append("2026-09-08T12:00:00,RandomAP,60.0,0.0,5.0,70.0,80.0,80.0,GO")
+    csv.write_text("\n".join([header, *rows]), encoding="utf-8")
 
     events = tmp_path / "events.csv"
     events.write_text(
@@ -36,10 +41,14 @@ class TestBuildPayload:
         p = sync.build_payload(days=7, anonymize=False)
         assert set(p) >= {"updated", "now", "networks", "incidents", "availability"}
         ssids = {n["ssid"] for n in p["networks"]}
-        assert ssids == {"HomeWifi", "CampusNet"}
+        assert ssids == {"HomeWifi", "CampusNet"}  # RandomAP (1 sample) filtered
         for net in p["networks"]:
             assert len(net["hourly"]) == 24
-            assert net["samples"] > 0
+            assert net["samples"] >= 10
+
+    def test_tiny_networks_filtered(self, sample_logs):
+        p = sync.build_payload(days=7, anonymize=False)
+        assert all(n["samples"] >= 10 for n in p["networks"])
 
     def test_anonymize(self, sample_logs):
         p = sync.build_payload(days=7, anonymize=True)

@@ -83,6 +83,7 @@ class Engine:
     deep: dict = None  # type: ignore[assignment]   # cached deep results
     last_deep_ts: float = 0.0
     event_state: events_mod.EventState = None  # type: ignore[assignment]
+    last_ssid: str | None = None  # carry-forward when netsh hiccups
 
     def __post_init__(self):
         if self.latency_history is None:
@@ -139,6 +140,14 @@ def run_light(engine: Engine) -> dict:
     """One light cycle: wifi + gateway + pings + DNS. Returns dashboard state."""
     cfg = engine.cfg
     wifi = get_wifi_info()
+
+    # netsh occasionally returns no SSID mid-transition — keep the last known
+    # one instead of logging a bogus "unknown" network.
+    if not wifi.get("ssid") and wifi.get("state") == "connected" and engine.last_ssid:
+        wifi["ssid"] = engine.last_ssid
+    elif wifi.get("ssid"):
+        engine.last_ssid = wifi["ssid"]
+
     gateway_ip = get_gateway()
 
     cycle = probe_cycle(cfg["targets"], gateway_ip, cfg["pings_per_probe"], cfg["ping_timeout_ms"])
