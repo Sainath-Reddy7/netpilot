@@ -36,7 +36,10 @@ def _send_webhook(title: str, message: str) -> bool:
 
 
 def notify(title: str, message: str, style: str = "red bold") -> None:
-    """Discord webhook + desktop toast (if available) + console panel."""
+    """Discord webhook + desktop toast (if available) + console panel.
+
+    Never raises — alerting must not kill the collector.
+    """
     _send_webhook(title, message)
     delivered = False
     try:
@@ -47,5 +50,11 @@ def notify(title: str, message: str, style: str = "red bold") -> None:
     except Exception:
         pass
     if not delivered:
-        print("\a")  # terminal bell
-    console.print(Panel(f"[bold]{title}[/bold]\n{message}", style=style))
+        try:
+            print("\a")  # terminal bell
+        except Exception:
+            pass
+    try:
+        console.print(Panel(f"[bold]{title}[/bold]\n{message}", style=style))
+    except Exception:
+        pass

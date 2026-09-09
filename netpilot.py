@@ -45,9 +45,17 @@ CONFIG_FILE = BASE_DIR / "config.json"
 __version__ = "2.2.0"
 
 # Some Windows consoles run cp1252 and choke on box/arrow characters;
-# degrade to replacement chars instead of crashing.
+# degrade to replacement chars instead of crashing. Under pythonw
+# (background collector) stdout/stderr are None — point them at devnull so
+# every print/alert path stays safe.
+import os
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 for _stream in (sys.stdout, sys.stderr):
-    if _stream and hasattr(_stream, "reconfigure"):
+    if hasattr(_stream, "reconfigure"):
         try:
             _stream.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
