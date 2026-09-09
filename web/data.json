@@ -1,11 +1,11 @@
 {
- "updated": "2026-09-09T14:38:18+05:30",
+ "updated": "2026-09-09T14:46:03+05:30",
  "now": {
   "ssid": "current network",
   "band": "5 GHz",
   "signal": 100,
   "verdict": "WARN",
-  "score": 45.8,
+  "score": 46.7,
   "avg_ms": null,
   "loss_pct": 100.0,
   "jitter_ms": null,
@@ -15,8 +15,8 @@
  "networks": [
   {
    "ssid": "Network A",
-   "samples": 4,
-   "median_score": 37.3,
+   "samples": 15,
+   "median_score": 45.8,
    "hourly": [
     {
      "lat": null,
@@ -105,8 +105,8 @@
     {
      "lat": NaN,
      "loss": 100.0,
-     "score": 34.6,
-     "n": 4
+     "score": 40.0,
+     "n": 15
     },
     {
      "lat": null,
@@ -623,11 +623,6 @@
    "when": "09 Sep 05:17",
    "type": "DNS_FAIL",
    "detail": "DNS resolution failing (3 hosts this cycle)."
-  },
-  {
-   "when": "09 Sep 01:08",
-   "type": "WIFI_DOWN",
-   "detail": "WiFi dropped (state: unknown)."
   }
  ],
  "availability": null
