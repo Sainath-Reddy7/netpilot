@@ -1,0 +1,472 @@
+{
+ "updated": "2026-09-09T14:23:20+05:30",
+ "now": null,
+ "networks": [
+  {
+   "ssid": "Network A",
+   "samples": 1,
+   "median_score": 28.8,
+   "hourly": [
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": 220.2,
+     "loss": 0.0,
+     "score": 28.8,
+     "n": 1
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    }
+   ]
+  },
+  {
+   "ssid": "Network B",
+   "samples": 33,
+   "median_score": 93.8,
+   "hourly": [
+    {
+     "lat": 41.7,
+     "loss": 0.0,
+     "score": 92.0,
+     "n": 3
+    },
+    {
+     "lat": 41.2,
+     "loss": 0.0,
+     "score": 92.9,
+     "n": 29
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": 43.0,
+     "loss": 0.0,
+     "score": 92.0,
+     "n": 1
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    }
+   ]
+  },
+  {
+   "ssid": "Network C",
+   "samples": 326,
+   "median_score": 49.6,
+   "hourly": [
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": 42.7,
+     "loss": 99.2,
+     "score": 49.6,
+     "n": 310
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": NaN,
+     "loss": 100.0,
+     "score": 36.0,
+     "n": 16
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    }
+   ]
+  }
+ ],
+ "incidents": [
+  {
+   "when": "09 Sep 05:17",
+   "type": "DNS_FAIL",
+   "detail": "DNS resolution failing (3 hosts this cycle)."
+  },
+  {
+   "when": "09 Sep 01:08",
+   "type": "WIFI_DOWN",
+   "detail": "WiFi dropped (state: unknown)."
+  }
+ ],
+ "availability": null
+}
