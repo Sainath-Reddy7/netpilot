@@ -198,6 +198,27 @@ def build_report(days: int = 7, html_export: bool = True) -> Path | None:
         console.print()
         console.print(incidents)
 
+    # Week-over-week trend per network (needs 8+ days of history)
+    if "overall_score" in df.columns and len(df) > 0:
+        df["week"] = (df["timestamp"] - df["timestamp"].min()).dt.days // 7
+        weekly = df.groupby(["ssid", "week"])["overall_score"].median()
+        trend_lines: list[str] = []
+        for ssid in weekly.index.get_level_values(0).unique():
+            weeks = weekly[ssid].dropna()
+            if len(weeks) >= 2:
+                first, last = float(weeks.iloc[0]), float(weeks.iloc[-1])
+                change = last - first
+                arrow = "↑" if change >= 3 else ("↓" if change <= -3 else "→")
+                color = "green" if change >= 3 else ("red" if change <= -3 else "yellow")
+                trend_lines.append(
+                    f"  [cyan]{ssid}[/cyan]: week 1 {first:.0f} → last week {last:.0f} "
+                    f"[{color}]{arrow} {change:+.0f}[/{color}]"
+                )
+        if trend_lines:
+            console.print("\n[bold]Week-over-week trend[/bold]")
+            for line in trend_lines:
+                console.print(line)
+
     avail = availability_pct(hours=days * 24)
     if avail is not None:
         style = "green" if avail >= 99 else ("yellow" if avail >= 95 else "red")

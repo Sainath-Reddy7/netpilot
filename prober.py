@@ -1,7 +1,13 @@
 """Prober: low-level network measurements on Windows.
 
+Two layers:
+  * PURE PARSERS (parse_*) — take raw text from Windows tools and return
+    structured data. No subprocess, fully unit-testable.
+  * SUBPROCESS WRAPPERS (ping, get_wifi_info, ...) — run the real commands
+    and feed their output to the parsers.
+
 Uses only built-in tools (ping, netsh, route) — no admin rights, no extra
-packages. Also exposes the raw radio/environment data used by wifi_env.
+packages.
 """
 
 from __future__ import annotations
@@ -42,43 +48,17 @@ class PingResult:
         return max(self.times_ms) if self.times_ms else None
 
 
-def _run(cmd: list[str], timeout: float = 10.0) -> str:
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-        return proc.stdout or ""
-    except (subprocess.TimeoutExpired, OSError):
-        return ""
+# -----------------------------------------------------------------------
+# PURE PARSERS
+# -----------------------------------------------------------------------
 
-
-def ping(host: str, count: int = 4, timeout_ms: int = 1500, df: bool = False, size: int | None = None) -> PingResult:
-    """Ping `host` `count` times using Windows ping and parse the reply.
-
-    df/size are used by the path-MTU probe (ping -f -l <size>).
-    """
+def parse_ping_output(text: str, host: str, count: int) -> PingResult:
     result = PingResult(host=host)
-    cmd = ["ping", "-n", str(count), "-w", str(timeout_ms)]
-    if df:
-        cmd.append("-f")
-    if size is not None:
-        cmd += ["-l", str(size)]
-    cmd.append(host)
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=count * (timeout_ms / 1000.0) + 10,
-        )
-        output = proc.stdout or ""
-    except (subprocess.TimeoutExpired, OSError):
-        result.sent = count
-        return result
-
-    times = re.findall(r"time[=<](\d+)ms", output)
+    times = re.findall(r"time[=<](\d+)ms", text)
     result.times_ms = [float(t) for t in times]
 
-    m = re.search(r"Sent = (\d+), Received = (\d+)", output)
+    m = re.search(r"Sent = (\d+), Received = (\d+)", text)
     if m:
         result.sent = int(m.group(1))
         result.received = int(m.group(2))
@@ -86,14 +66,11 @@ def ping(host: str, count: int = 4, timeout_ms: int = 1500, df: bool = False, si
         result.sent = count
         result.received = len(times)
 
-    # "Packet needs to be fragmented but DF set" — treated as full loss by
-    # the stats above; the MTU module reads this case itself.
-    result.df_blocked = bool(re.search(r"needs to be fragmented", output, re.IGNORECASE))
+    result.df_blocked = bool(re.search(r"needs to be fragmented", text, re.IGNORECASE))
     return result
 
 
-def get_wifi_info() -> dict:
-    """Current Wi-Fi adapter state from `netsh wlan show interfaces`."""
+def parse_wifi_interfaces(text: str) -> dict:
     info = {
         "state": "unknown",
         "ssid": None,
@@ -105,8 +82,6 @@ def get_wifi_info() -> dict:
         "rx_rate": None,
         "tx_rate": None,
     }
-    output = _run(["netsh", "wlan", "show", "interfaces"])
-
     patterns = [
         ("state", r"\s*State\s+:\s*(.+?)\s*$", str),
         # "SSID" but not "BSSID"
@@ -119,7 +94,7 @@ def get_wifi_info() -> dict:
         ("rx_rate", r"\s*Receive rate \(Mbps\)\s+:\s*(\d+\.?\d*)", float),
         ("tx_rate", r"\s*Transmit rate \(Mbps\)\s+:\s*(\d+\.?\d*)", float),
     ]
-    for line in output.splitlines():
+    for line in text.splitlines():
         for key, pattern, cast in patterns:
             m = re.match(pattern, line)
             if m:
@@ -129,13 +104,12 @@ def get_wifi_info() -> dict:
     return info
 
 
-def get_gateway() -> str | None:
-    """Default gateway IP from the IPv4 routing table (lowest metric wins)."""
-    output = _run(["route", "print", "-4", "0.0.0.0"])
+def parse_gateway_from_routes(text: str) -> str | None:
+    """Default gateway IP from `route print -4 0.0.0.0` output (lowest metric)."""
     best: tuple[int, str] | None = None
     for m in re.finditer(
-        rf"^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+({IPV4_RE})\s+\S+\s+(\d+)\s",
-        output,
+        rf"^[ \t]*0\.0\.0\.0[ \t]+0\.0\.0\.0[ \t]+({IPV4_RE})[ \t]+\S+[ \t]+(\d+)(?:[ \t]+[^\r\n]+)?[ \t]*$",
+        text,
         re.MULTILINE,
     ):
         gateway, metric = m.group(1), int(m.group(2))
@@ -144,19 +118,15 @@ def get_gateway() -> str | None:
     return best[1] if best else None
 
 
-def get_visible_networks() -> list[str]:
-    """SSIDs currently in range (used before attempting an auto-switch)."""
-    output = _run(["netsh", "wlan", "show", "networks"])
+def parse_visible_networks(text: str) -> list[str]:
     return [
         m.group(1).strip()
-        for m in re.finditer(r"^\s*SSID\s+\d+\s*:\s*(.+?)\s*$", output, re.MULTILINE)
+        for m in re.finditer(r"^\s*SSID\s+\d+\s*:\s*(.+?)\s*$", text, re.MULTILINE)
     ]
 
 
-def scan_wifi_environment() -> list[dict]:
-    """All visible APs with BSSID/signal/channel/band.
-
-    Output of `netsh wlan show networks mode=bssid` looks like:
+def parse_bssid_scan(text: str) -> list[dict]:
+    """Parse `netsh wlan show networks mode=bssid` output:
 
         SSID 1 : Sai
             Network type         : Infrastructure
@@ -166,14 +136,12 @@ def scan_wifi_environment() -> list[dict]:
                  Radio type      : 802.11n
                  Channel         : 10
                  Band            : 2.4 GHz
-            BSSID 2             : ...
     """
-    output = _run(["netsh", "wlan", "show", "networks", "mode=bssid"], timeout=20)
     aps: list[dict] = []
     current_ssid: str | None = None
     current: dict | None = None
 
-    for line in output.splitlines():
+    for line in text.splitlines():
         m = re.match(r"^\s*SSID\s+\d+\s*:\s*(.+?)\s*$", line)
         if m:
             current_ssid = m.group(1)
@@ -202,6 +170,60 @@ def scan_wifi_environment() -> list[dict]:
             if m:
                 current["band"] = m.group(1)
     return aps
+
+
+# -----------------------------------------------------------------------
+# SUBPROCESS WRAPPERS
+# -----------------------------------------------------------------------
+
+def _run(cmd: list[str], timeout: float = 10.0) -> str:
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return proc.stdout or ""
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
+
+
+def ping(host: str, count: int = 4, timeout_ms: int = 1500, df: bool = False, size: int | None = None) -> PingResult:
+    """Ping `host` `count` times using Windows ping and parse the reply.
+
+    df/size are used by the path-MTU probe (ping -f -l <size>).
+    """
+    cmd = ["ping", "-n", str(count), "-w", str(timeout_ms)]
+    if df:
+        cmd.append("-f")
+    if size is not None:
+        cmd += ["-l", str(size)]
+    cmd.append(host)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=count * (timeout_ms / 1000.0) + 10,
+        )
+        output = proc.stdout or ""
+    except (subprocess.TimeoutExpired, OSError):
+        return PingResult(host=host, sent=count)
+
+    return parse_ping_output(output, host, count)
+
+
+def get_wifi_info() -> dict:
+    return parse_wifi_interfaces(_run(["netsh", "wlan", "show", "interfaces"]))
+
+
+def get_gateway() -> str | None:
+    return parse_gateway_from_routes(_run(["route", "print", "-4", "0.0.0.0"]))
+
+
+def get_visible_networks() -> list[str]:
+    return parse_visible_networks(_run(["netsh", "wlan", "show", "networks"]))
+
+
+def scan_wifi_environment() -> list[dict]:
+    return parse_bssid_scan(_run(["netsh", "wlan", "show", "networks", "mode=bssid"], timeout=20))
 
 
 def try_switch_to_ssid(ssid: str) -> bool:

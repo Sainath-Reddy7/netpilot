@@ -16,10 +16,13 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
 
       - name: Compile all modules
-        run: python -m py_compile netpilot.py prober.py health.py dashboard.py dnscheck.py bloat.py traceroute.py mtu.py vpndetect.py events.py logger.py report.py wifi_env.py notify.py
+        run: python -m py_compile netpilot.py prober.py health.py dashboard.py dnscheck.py bloat.py traceroute.py mtu.py vpndetect.py events.py logger.py report.py wifi_env.py notify.py web.py
 
-      - name: Import smoke test
-        run: python -c "import netpilot, prober, health, dashboard, dnscheck, bloat, traceroute, mtu, vpndetect, events, logger, report, wifi_env, notify; print('all modules import cleanly')"
+      - name: Run test suite
+        run: python -m pytest tests/ -q
+
+      - name: Publish demo web dashboard (artifacts check)
+        run: python netpilot.py --publish --demo

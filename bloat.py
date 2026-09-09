@@ -21,8 +21,6 @@ from dataclasses import dataclass
 
 from prober import ping
 
-BLOAT_GRADES = ["A+", "A", "B", "C", "F"]
-
 
 @dataclass
 class BloatSnapshot:
@@ -32,22 +30,52 @@ class BloatSnapshot:
     throughput_mbps: float | None = None
     grade: str = "n/a"
     note: str = ""
+    up_baseline_ms: float | None = None
+    up_loaded_ms: float | None = None
+    up_delta_ms: float | None = None
+    up_grade: str = "n/a"
+    up_mbps: float | None = None
 
     @property
     def tested(self) -> bool:
-        return self.delta_ms is not None
+        return self.delta_ms is not None or self.up_delta_ms is not None
+
+    @property
+    def worst_delta_ms(self) -> float | None:
+        deltas = [d for d in (self.delta_ms, self.up_delta_ms) if d is not None]
+        return max(deltas) if deltas else None
 
     def score(self) -> float:
-        """Convert bloat delta to a 0-100 score (also used for the grade)."""
-        if not self.tested:
+        """Convert worst-direction bloat delta to a 0-100 score."""
+        delta = self.worst_delta_ms
+        if delta is None:
             return 100.0  # untested shouldn't penalize light-mode cycles
-        delta = self.delta_ms
         if delta <= 5:
             return 100.0
         if delta <= 150:
             # linear 100 -> 40 between 5 and 150 ms of added latency
             return round(100 - (delta - 5) * (60 / 145), 1)
         return max(10.0, round(40 - (delta - 150) * 0.15, 1))
+
+
+def _grade_delta(delta_ms: float) -> str:
+    if delta_ms <= 5:
+        return "A+"
+    if delta_ms <= 30:
+        return "A"
+    if delta_ms <= 60:
+        return "B"
+    if delta_ms <= 150:
+        return "C"
+    return "F"
+
+
+_HEADERS = {
+    # Cloudflare 403s bare Python requests; a normal-looking
+    # Accept header + UA gets through fine.
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NetPilot/2.0",
+    "Accept": "*/*",
+}
 
 
 class _Downloader(threading.Thread):
@@ -66,15 +94,7 @@ class _Downloader(threading.Thread):
     def run(self) -> None:
         start = time.perf_counter()
         try:
-            req = urllib.request.Request(
-                self.url,
-                headers={
-                    # Cloudflare 403s bare Python requests; a normal-looking
-                    # Accept header + UA gets through fine.
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NetPilot/2.0",
-                    "Accept": "*/*",
-                },
-            )
+            req = urllib.request.Request(self.url, headers=dict(_HEADERS))
             with urllib.request.urlopen(req, timeout=20) as resp:
                 while not self._stop.is_set():
                     chunk = resp.read(65536)
@@ -87,10 +107,60 @@ class _Downloader(threading.Thread):
             self.elapsed = time.perf_counter() - start
 
 
-def measure_bloat(url: str, target: str, load_pings: int, min_download_mb: int) -> BloatSnapshot:
+class _Uploader(threading.Thread):
+    """POSTs chunks to an endpoint (e.g. speed.cloudflare.com/__up) until stopped."""
+
+    def __init__(self, url: str, chunk_bytes: int = 1_000_000, max_chunks: int = 8):
+        super().__init__(daemon=True)
+        self.url = url
+        self.chunk_bytes = chunk_bytes
+        self.max_chunks = max_chunks
+        self.bytes_sent = 0
+        self.elapsed = 0.0
+        self.error: str | None = None
+        self._stop = threading.Event()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def run(self) -> None:
+        start = time.perf_counter()
+        payload = b"n" * self.chunk_bytes
+        try:
+            while not self._stop.is_set() and (self.bytes_sent // self.chunk_bytes) < self.max_chunks:
+                req = urllib.request.Request(
+                    self.url, data=payload, method="POST", headers=dict(_HEADERS)
+                )
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    resp.read()
+                self.bytes_sent += self.chunk_bytes
+        except Exception as exc:
+            self.error = str(exc)[:120]
+        finally:
+            self.elapsed = time.perf_counter() - start
+
+
+def _ping_during_load(target: str, load_pings: int, deadline_s: float = 25) -> list[float]:
+    """Ping while a load thread runs; returns the collected latency samples."""
+    times: list[float] = []
+    deadline = time.perf_counter() + deadline_s
+    while len(times) < load_pings and time.perf_counter() < deadline:
+        r = ping(target, 1, 1500)
+        times += r.times_ms  # timeouts simply contribute no sample
+        time.sleep(0.3)
+    return times
+
+
+def measure_bloat(
+    url: str,
+    target: str,
+    load_pings: int,
+    min_download_mb: int,
+    up_url: str = "https://speed.cloudflare.com/__up",
+) -> BloatSnapshot:
     snap = BloatSnapshot()
 
-    # 1. Baseline: 3 quick single pings.
+    # --- shared baseline ---
     base_times: list[float] = []
     for _ in range(3):
         r = ping(target, 1, 1000)
@@ -99,48 +169,48 @@ def measure_bloat(url: str, target: str, load_pings: int, min_download_mb: int) 
             snap.note = f"No baseline connectivity to {target} — bloat test skipped."
             return snap
     snap.baseline_ms = sum(base_times) / len(base_times)
+    snap.up_baseline_ms = snap.baseline_ms
 
-    # 2. Download while pinging.
+    # --- download direction ---
     dl = _Downloader(url, min_download_mb * 1_000_000)
     dl.start()
-    loaded_times: list[float] = []
-    deadline = time.perf_counter() + 25
-    while len(loaded_times) < load_pings and time.perf_counter() < deadline:
-        if not dl.is_alive() and dl.bytes_read >= dl.min_bytes:
-            break
-        r = ping(target, 1, 1500)
-        loaded_times += r.times_ms  # timeouts simply contribute no sample
-        time.sleep(0.3)
+    dl_times = _ping_during_load(target, load_pings, deadline_s=25)
     dl.stop()
     dl.join(timeout=5)
 
-    if dl.error and dl.bytes_read == 0:
-        snap.note = f"Download test blocked/failed ({dl.error})."
-        return snap
+    if not (dl.error and dl.bytes_read == 0):
+        if dl.bytes_read >= dl.min_bytes and dl.elapsed > 0:
+            snap.throughput_mbps = (dl.bytes_read * 8 / 1_000_000) / dl.elapsed
+        if dl_times:
+            snap.loaded_ms = sum(dl_times) / len(dl_times)
+            snap.delta_ms = max(0.0, snap.loaded_ms - snap.baseline_ms)
+            snap.grade = _grade_delta(snap.delta_ms)
 
-    if dl.bytes_read >= dl.min_bytes and dl.elapsed > 0:
-        snap.throughput_mbps = (dl.bytes_read * 8 / 1_000_000) / dl.elapsed
+    # --- upload direction (video calls suffer here) ---
+    up = _Uploader(up_url)
+    up.start()
+    up_times = _ping_during_load(target, load_pings, deadline_s=30)
+    up.stop()
+    up.join(timeout=5)
 
-    if loaded_times:
-        snap.loaded_ms = sum(loaded_times) / len(loaded_times)
-        snap.delta_ms = max(0.0, snap.loaded_ms - snap.baseline_ms)
+    if not (up.error and up.bytes_sent == 0):
+        if up.bytes_sent > 0 and up.elapsed > 0:
+            snap.up_mbps = (up.bytes_sent * 8 / 1_000_000) / up.elapsed
+        if up_times:
+            snap.up_loaded_ms = sum(up_times) / len(up_times)
+            snap.up_delta_ms = max(0.0, snap.up_loaded_ms - snap.up_baseline_ms)
+            snap.up_grade = _grade_delta(snap.up_delta_ms)
 
-        if snap.delta_ms <= 5:
-            snap.grade = "A+"
-        elif snap.delta_ms <= 30:
-            snap.grade = "A"
-        elif snap.delta_ms <= 60:
-            snap.grade = "B"
-        elif snap.delta_ms <= 150:
-            snap.grade = "C"
-        else:
-            snap.grade = "F"
-
-    if snap.delta_ms and snap.delta_ms > 60:
+    # --- verdict note ---
+    worst = snap.worst_delta_ms
+    if worst is not None and worst > 60:
+        direction = "downloads" if snap.delta_ms == worst else "uploads"
         snap.note = (
-            f"+{snap.delta_ms:.0f} ms of added latency under load — downloads/uploads "
+            f"+{worst:.0f} ms of added latency during {direction} — transfers "
             "will lag everything on this network (bufferbloat)."
         )
     elif snap.tested:
-        snap.note = "Latency stays healthy under load."
+        snap.note = "Latency stays healthy under load (both directions)."
+    elif dl.error and dl.bytes_read == 0:
+        snap.note = f"Download test blocked/failed ({dl.error})."
     return snap

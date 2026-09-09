@@ -47,6 +47,10 @@
   "spike_p95_ms": 250,
   "auto_switch_cooldown_s": 300,
 
+  "alerts": {
+    "webhook_url": null
+  },
+
   "deep_interval_min": 30,
   "log_enabled": true
 }

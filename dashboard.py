@@ -182,9 +182,14 @@ def _deep_panel(state: dict) -> Panel:
 
     rows: list[tuple[str, object]] = []
     if bloat and bloat.tested:
-        rows.append(("Bloat", f"+{bloat.delta_ms:.0f} ms under load → {bloat.grade}"))
+        if bloat.delta_ms is not None:
+            rows.append(("Bloat ↓", f"+{bloat.delta_ms:.0f} ms under load → {bloat.grade}"))
+        if bloat.up_delta_ms is not None:
+            rows.append(("Bloat ↑", f"+{bloat.up_delta_ms:.0f} ms under load → {bloat.up_grade}"))
         if bloat.throughput_mbps:
             rows.append(("Download", f"{bloat.throughput_mbps:.1f} Mbps"))
+        if bloat.up_mbps:
+            rows.append(("Upload", f"{bloat.up_mbps:.1f} Mbps"))
     elif bloat and bloat.note:
         rows.append(("Bloat", bloat.note))
     else:

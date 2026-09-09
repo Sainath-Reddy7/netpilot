@@ -28,6 +28,7 @@ from rich.panel import Panel
 
 import events as events_mod
 import logger as logmod
+import notify as notify_mod
 from bloat import measure_bloat
 from dashboard import build_dashboard, build_full_report
 from dnscheck import snapshot_dns
@@ -41,13 +42,16 @@ from wifi_env import snapshot_wifi_env
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "config.json"
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 console = Console()
 
 
 def load_config() -> dict:
     with open(CONFIG_FILE, encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+    # Discord-compatible webhook for alerts (optional)
+    notify_mod.WEBHOOK_URL = (cfg.get("alerts") or {}).get("webhook_url") or None
+    return cfg
 
 
 @dataclass
@@ -349,8 +353,11 @@ def main() -> int:
     mode.add_argument("--once", action="store_true", help="single light check, then exit")
     mode.add_argument("--full", action="store_true", help="single DEEP check (traceroute, bloat, MTU, channel scan)")
     mode.add_argument("--report", action="store_true", help="build report from logs")
+    mode.add_argument("--publish", action="store_true", help="generate shareable web dashboard (web/index.html)")
     parser.add_argument("--version", action="version", version=f"netpilot {__version__}")
-    parser.add_argument("--days", type=int, default=7, help="days of history for --report (default 7)")
+    parser.add_argument("--days", type=int, default=7, help="days of history for --report/--publish (default 7)")
+    parser.add_argument("--demo", action="store_true", help="with --publish: use synthetic demo data (no real SSIDs)")
+    parser.add_argument("--anon", action="store_true", help="with --publish: pseudonymize network names")
     parser.add_argument("--no-html", action="store_true", help="skip HTML report export")
     parser.add_argument("--auto", metavar="SSID", help="auto-switch to this saved Wi-Fi when path is DEAD")
     parser.add_argument("--deep-interval", type=float, default=None, metavar="MIN", help="minutes between deep diagnostics in live mode")
@@ -369,6 +376,18 @@ def main() -> int:
 
         path = build_report(args.days, html_export=not args.no_html)
         return 0 if path else 1
+
+    if args.publish:
+        from web import publish
+
+        try:
+            path = publish(days=args.days, demo=args.demo, anon=args.anon)
+        except SystemExit as e:
+            console.print(f"[red]{e}[/red]")
+            return 1
+        console.print(f"[green]Web dashboard written:[/green] {path}")
+        console.print("Deploy: push to GitHub → vercel.com → Import repo (web/ is already configured).")
+        return 0
 
     engine = make_engine(cfg)
     deep_interval = args.deep_interval if args.deep_interval is not None else cfg.get("deep_interval_min", 30)
