@@ -18,6 +18,10 @@ from dataclasses import dataclass, field
 
 IPV4_RE = r"\d+\.\d+\.\d+\.\d+"
 
+# Console subprocesses (ping/netsh/route) must not flash a window when the
+# collector runs in the background (pythonw) — CREATE_NO_WINDOW stops that.
+CREATE_NO_WINDOW = 0x08000000
+
 
 @dataclass
 class PingResult:
@@ -178,7 +182,10 @@ def parse_bssid_scan(text: str) -> list[dict]:
 
 def _run(cmd: list[str], timeout: float = 10.0) -> str:
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            creationflags=CREATE_NO_WINDOW,
+        )
         return proc.stdout or ""
     except (subprocess.TimeoutExpired, OSError):
         return ""
@@ -202,6 +209,7 @@ def ping(host: str, count: int = 4, timeout_ms: int = 1500, df: bool = False, si
             capture_output=True,
             text=True,
             timeout=count * (timeout_ms / 1000.0) + 10,
+            creationflags=CREATE_NO_WINDOW,
         )
         output = proc.stdout or ""
     except (subprocess.TimeoutExpired, OSError):
@@ -234,6 +242,7 @@ def try_switch_to_ssid(ssid: str) -> bool:
             capture_output=True,
             text=True,
             timeout=15,
+            creationflags=CREATE_NO_WINDOW,
         )
         return proc.returncode == 0
     except (subprocess.TimeoutExpired, OSError):

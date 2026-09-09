@@ -66,8 +66,10 @@ def process_cycle(
     now = datetime.now()
 
     # --- WiFi disconnect / reconnect ---
-    if state.prev_state and state.prev_state == "connected" and wifi_state != "connected":
-        fired.append(emit("WIFI_DOWN", f"WiFi dropped (state: {wifi_state})."))
+    # Only an explicit "disconnected" counts — "unknown" means netsh
+    # hiccuped (e.g. during sleep/wake), which is not a real drop.
+    if state.prev_state and state.prev_state == "connected" and wifi_state == "disconnected":
+        fired.append(emit("WIFI_DOWN", "WiFi dropped."))
     if state.prev_state and state.prev_state != "connected" and wifi_state == "connected":
         fired.append(emit("WIFI_UP", f"WiFi reconnected to {ssid or 'network'}."))
 

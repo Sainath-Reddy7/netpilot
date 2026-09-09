@@ -23,6 +23,7 @@ from pathlib import Path
 
 import events as events_mod
 import logger as logmod
+from prober import CREATE_NO_WINDOW
 
 GITHUB_API = "https://api.github.com"
 
@@ -40,6 +41,7 @@ def _github_token() -> str | None:
             capture_output=True,
             text=True,
             timeout=10,
+            creationflags=CREATE_NO_WINDOW,
         )
         for line in (proc.stdout or "").splitlines():
             if line.startswith("password="):
