@@ -41,6 +41,7 @@ from wifi_env import snapshot_wifi_env
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "config.json"
+__version__ = "2.1.0"
 console = Console()
 
 
@@ -348,6 +349,7 @@ def main() -> int:
     mode.add_argument("--once", action="store_true", help="single light check, then exit")
     mode.add_argument("--full", action="store_true", help="single DEEP check (traceroute, bloat, MTU, channel scan)")
     mode.add_argument("--report", action="store_true", help="build report from logs")
+    parser.add_argument("--version", action="version", version=f"netpilot {__version__}")
     parser.add_argument("--days", type=int, default=7, help="days of history for --report (default 7)")
     parser.add_argument("--no-html", action="store_true", help="skip HTML report export")
     parser.add_argument("--auto", metavar="SSID", help="auto-switch to this saved Wi-Fi when path is DEAD")

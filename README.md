@@ -1,5 +1,10 @@
 # NetPilot 📡
 
+[![CI](https://github.com/Sainath-Reddy7/netpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Sainath-Reddy7/netpilot/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-windows-blueviolet)](https://github.com)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **A comprehensive network health monitor for Windows** — built after two days of
 fighting hostel Wi-Fi and mobile hotspot congestion. NetPilot measures everything
 that actually makes a network *feel* bad, tells you exactly **which layer is the
@@ -8,24 +13,16 @@ problem**, and learns **when your networks are usable** over time.
 > Speedtests measure Mbps. NetPilot measures what hurts: latency, jitter, packet
 > loss, bufferbloat, DNS behavior, radio congestion — layer by layer.
 
-```
-$ python netpilot.py --full
-```
-```
-┌───────────────────── NetPilot ── 2026-09-09 14:22 ─────────────────────┐
-│  OVERALL: A 92/100 — GO      path A · link A · DNS A · radio B        │
-│  Campus-5G · 5 GHz ch36 · VPN: none                                    │
-├───────────────────────┬────────────────────────────────────────────────┤
-│ LOCAL LINK            │ INTERNET PATH                                  │
-│  gateway 2 ms · 0%    │  34 ms avg · 5 ms jitter · p95 48 · 0% loss    │
-│  signal 100%          │  Trend: ▁▂▂▁▃▁▁▂▁▁▁▂▁                          │
-│ WIFI ENVIRONMENT      │ DNS                                            │
-│  ch36: 2 strong       │  resolvers 10.x · 12 ms · no hijack            │
-│  "radio clean"        │ DEEP: bloat A (+8ms) · 42 Mbps · MTU 1500      │
-├───────────────────────┴────────────────────────────────────────────────┤
-│ EVENTS: 21:34 OUTAGE 4m — upstream congestion · 20:01 AP_ROAM ...      │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+## Screenshots
+
+**Live dashboard** (`python netpilot.py`):
+
+![live dashboard](docs/screenshots/dashboard.svg)
+
+**Full diagnostics** (`python netpilot.py --full` — traceroute, bufferbloat,
+throughput, path MTU, channel scan, VPN detection):
+
+![full report](docs/screenshots/full-report.svg)
 
 ## What it measures (and why)
 
@@ -50,9 +47,8 @@ Everything runs with **no admin rights** and only uses built-in Windows tools
 Python 3.10+ on Windows.
 
 ```bash
-pip install rich                 # required — dashboard
-pip install pandas matplotlib    # required — reports
-pip install plyer                # optional — Windows toast notifications
+pip install -r requirements.txt   # rich, pandas, matplotlib
+pip install plyer                 # optional: Windows toast notifications
 ```
 
 ## Usage
@@ -129,14 +125,15 @@ vpndetect.py    WARP/WireGuard/Tailscale/OpenVPN detection
 events.py       incident detection (outages, roaming, DNS fails) + timeline
 logger.py       CSV logging (schema v2, auto-migrates v1 files)
 report.py       heatmap, schedules, incidents, availability, HTML export
-config.json     every threshold and target — tweak without touching code
+notify.py       Windows toast notifications (plyer) with console fallback
+scripts/        maintenance scripts (screenshot generation)
 ```
 
 ## Notes & limits
 
 - Windows-only for now (the probe layer parses `ping`/`netsh`/`route`/`tracert` output).
-- Deep diagnostics download ~16 MB (bufferbloat test) — skip on metered connections
-  or raise/decrease `bloat.url` bytes in the config.
+- Deep diagnostics download ~10 MB (bufferbloat test) — skip on metered connections
+  or tune `bloat.url` bytes in the config.
 - Logs and reports stay in `logs/` and `reports/` — they contain your SSIDs, and
   both folders are git-ignored by default.
 - Auto-switch connects only to **saved** Wi-Fi profiles, only if visible, and backs
@@ -149,6 +146,10 @@ config.json     every threshold and target — tweak without touching code
 - Auto toggle VPN (WireGuard/WARP) on verdict changes
 - Linux/macOS support (probe abstraction)
 - Optional system-tray build (pystray)
+
+## License
+
+[MIT](LICENSE) © 2026 Sainath Reddy
 
 ---
 

@@ -1,0 +1,7 @@
+# NetPilot requirements (Python 3.10+, Windows)
+rich>=13.0          # dashboard & console rendering
+pandas>=2.0         # report analysis
+matplotlib>=3.7     # heatmap rendering
+
+# Optional — Windows toast notifications (falls back to console alerts):
+# plyer>=2.1
