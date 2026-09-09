@@ -159,6 +159,11 @@ def build_payload(
         if payload.get("now"):
             payload["now"]["ssid"] = "current network"
 
+    try:
+        payload["availability"] = events_mod.availability_pct(hours=days * 24)
+    except Exception:
+        pass
+
     return payload
 
 
