@@ -43,6 +43,16 @@ from wifi_env import snapshot_wifi_env
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "config.json"
 __version__ = "2.2.0"
+
+# Some Windows consoles run cp1252 and choke on box/arrow characters;
+# degrade to replacement chars instead of crashing.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 console = Console()
 
 
@@ -386,7 +396,7 @@ def main() -> int:
             console.print(f"[red]{e}[/red]")
             return 1
         console.print(f"[green]Web dashboard written:[/green] {path}")
-        console.print("Deploy: push to GitHub → vercel.com → Import repo (web/ is already configured).")
+        console.print("Deploy: push to GitHub, then vercel.com -> Add New -> Import repo (web/ is already configured).")
         return 0
 
     engine = make_engine(cfg)
