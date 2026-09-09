@@ -1,11 +1,11 @@
 {
- "updated": "2026-09-09T14:32:33+05:30",
+ "updated": "2026-09-09T14:38:18+05:30",
  "now": {
   "ssid": "current network",
   "band": "5 GHz",
   "signal": 100,
   "verdict": "WARN",
-  "score": 46.2,
+  "score": 45.8,
   "avg_ms": null,
   "loss_pct": 100.0,
   "jitter_ms": null,
@@ -15,8 +15,8 @@
  "networks": [
   {
    "ssid": "Network A",
-   "samples": 2,
-   "median_score": 31.9,
+   "samples": 4,
+   "median_score": 37.3,
    "hourly": [
     {
      "lat": null,
@@ -105,8 +105,8 @@
     {
      "lat": NaN,
      "loss": 100.0,
-     "score": 31.9,
-     "n": 2
+     "score": 34.6,
+     "n": 4
     },
     {
      "lat": null,
