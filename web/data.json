@@ -1,9 +1,170 @@
 {
- "updated": "2026-09-09T14:23:20+05:30",
- "now": null,
+ "updated": "2026-09-09T14:25:21+05:30",
+ "now": {
+  "ssid": "current network",
+  "band": "5 GHz",
+  "signal": 100,
+  "verdict": "DEAD",
+  "score": 17.6,
+  "avg_ms": null,
+  "loss_pct": 100.0,
+  "jitter_ms": null,
+  "vpn": ""
+ },
  "networks": [
   {
    "ssid": "Network A",
+   "samples": 1,
+   "median_score": 17.6,
+   "hourly": [
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": NaN,
+     "loss": 100.0,
+     "score": 17.6,
+     "n": 1
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    },
+    {
+     "lat": null,
+     "loss": null,
+     "score": null,
+     "n": 0
+    }
+   ]
+  },
+  {
+   "ssid": "Network B",
    "samples": 1,
    "median_score": 28.8,
    "hourly": [
@@ -154,7 +315,7 @@
    ]
   },
   {
-   "ssid": "Network B",
+   "ssid": "Network C",
    "samples": 33,
    "median_score": 93.8,
    "hourly": [
@@ -305,7 +466,7 @@
    ]
   },
   {
-   "ssid": "Network C",
+   "ssid": "Network D",
    "samples": 326,
    "median_score": 49.6,
    "hourly": [
